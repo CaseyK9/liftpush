@@ -139,7 +139,8 @@ fn parse_meta(file : &str) -> Option<FileMetadata> {
 }
 
 #[post("/", data = "<data>", rank = 1)]
-fn upload(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file : RandomFilename)
+fn upload(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file : RandomFilename,
+    config : State<Config>)
     -> Result<Json<UploadStatus>, String> {
     // Rocket does not support multipart forms (for whatever goddamn reason),
     //  so we directly hook 'multipart' here.
@@ -214,7 +215,7 @@ fn upload(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file :
                 .into_result_strict().unwrap();
 
             Ok(Json(UploadStatus {
-                url: "http://localhost:8000/".to_string() + &url
+                url: config.base_url.clone() + &url
             }))
         }
         _ => Err(format!("Multipart segment was not file"))

@@ -1,6 +1,7 @@
 .idea/
 *.iml
 Rocket.toml
+config.json
 
 /target/
 **/*.rs.bk
