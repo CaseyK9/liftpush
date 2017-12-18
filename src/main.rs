@@ -167,7 +167,7 @@ fn parse_meta(file : &str) -> Option<FileMetadata> {
             println!("File {} is unreadable!", file);
             return None;
         },
-        Ok(_) => println!("successfully read {}", meta_filename),
+        Ok(_) => (),
     }
 
     let meta : serde_json::Result<FileMetadata> = serde_json::from_str(&meta_string);
@@ -262,7 +262,7 @@ fn upload(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file :
                                          why.description());
                                 return Err(format!("Failed to write file"));
                             },
-                            Ok(_) => println!("successfully wrote to {}", meta_filename),
+                            Ok(_) => (),
                         }
 
                         FileMetadata::new_from_text(original_filename,
@@ -303,7 +303,7 @@ fn upload(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file :
                            why.description());
                     return Err(format!("Failed to write file"));
                 },
-                Ok(_) => println!("successfully wrote to {}", meta_filename),
+                Ok(_) => ()
             }
 
             Ok(Json(UploadStatus {
@@ -481,7 +481,7 @@ fn rename_file(_user : User, file: String, to : String) -> Option<String> {
                      why.description());
             return None;
         },
-        Ok(_) => println!("successfully wrote to {}", meta_filename),
+        Ok(_) => (),
     }
 
     Some(format!("Renamed"))
@@ -547,7 +547,7 @@ fn get_pushed_file(file: String) -> Option<FileResponseType> {
                     println!("File {} is unreadable!", file);
                     return None;
                 },
-                Ok(_) => println!("successfully read {}", meta_filename),
+                Ok(_) => (),
             }
 
             Some(FileResponseType::Template {
