@@ -1,0 +1,48 @@
+{{#*inline "additionalStyles"}}
+    <link type="text/css" rel="stylesheet" href="css/agate.css"  media="screen,projection"/>
+
+    <style>
+        body {
+            background: #333;
+        }
+
+        code {
+            padding: 1.5rem !important;
+        }
+
+        pre {
+            margin: 0;
+            width: 75%;
+            min-height: 100%;
+        }
+
+        .padded-box {
+            padding: 1rem;
+            position: fixed;
+            left: 75%;
+            width: 25%;
+            height: 100%;
+            background: #fff;
+        }
+    </style>
+{{/inline}}
+
+{{> header title=meta.filename headers="additionalStyles" }}
+
+<div class="padded-box">
+    <h3>{{ meta.filename }}</h3>
+    <h6>Uploaded: {{ meta.date }}</h6>
+    <h6>
+        <label for="link-box">Link: </label>
+        <input id="link-box" type="text" readonly onclick="focus();select();" value="todo"/>
+    </h6>
+</div>
+
+<pre><code>{{ contents }}</code></pre>
+
+{{> scripts }}
+
+<script type="text/javascript" src="js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+{{> footer }}

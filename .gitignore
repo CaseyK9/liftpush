@@ -3,5 +3,7 @@
 Rocket.toml
 config.json
 
+d/
+
 /target/
 **/*.rs.bk
