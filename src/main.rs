@@ -112,6 +112,12 @@ struct FileMetadata {
     actual_filename : Option<String>
 }
 
+#[derive(Serialize)]
+struct ManageMetadata {
+    name : String,
+    meta : FileMetadata
+}
+
 impl FileMetadata {
     fn new_from_file(filename : String, actual_filename : String) -> Self {
         Self {
@@ -360,14 +366,14 @@ fn logout(_user : User, mut cookies: Cookies, sessions: State<Mutex<SessionStore
 #[derive(Serialize)]
 pub struct FileViewerState {
     username : String,
-    files : Vec<FileMetadata>
+    files : Vec<ManageMetadata>
 }
 
 #[get("/")]
 fn manage(user : User) -> Template {
     let paths = fs::read_dir("d").unwrap();
 
-    let mut found_files : Vec<FileMetadata> = Vec::new();
+    let mut found_files : Vec<ManageMetadata> = Vec::new();
 
     for path in paths {
         let path : DirEntry = path.unwrap();
@@ -375,16 +381,18 @@ fn manage(user : User) -> Template {
         let filename = path_filename.to_str().unwrap();
 
         if filename.ends_with(".info.json") {
-            println!("Got match on {}", filename);
-            if let Some(meta) = parse_meta(filename.split(".").next().unwrap()) {
-                println!("Got meta on {}", filename);
-                found_files.push(meta);
+            let name : &str = filename.split(".").next().unwrap();
+            if let Some(meta) = parse_meta(name) {
+                found_files.push(ManageMetadata {
+                    name : name.to_string(),
+                    meta
+                });
             }
         }
     }
 
     found_files.sort_by(|a, b|
-        b.date.partial_cmp(&a.date).unwrap());
+        b.meta.date.partial_cmp(&a.meta.date).unwrap());
 
     Template::render("manage", &FileViewerState {
         username : user.username,
@@ -413,6 +421,70 @@ fn delete_file(_user : User, file: String) -> Option<String> {
     fs::remove_file(Path::new("d/").join(file + ".info.json")).unwrap();
 
     Some(format!("Deleted"))
+}
+
+#[get("/<file>/<to>")]
+fn rename_file(_user : User, file: String, to : String) -> Option<String> {
+    if file.contains(".") || file.contains("/") || file.contains("\\") {
+        return None;
+    }
+
+    let mut meta = parse_meta(&file)?;
+
+    match meta.actual_filename {
+        Some(name) => {
+            let new_filename = match name.split(".").next() {
+                Some(raw_name) => {
+                    let extension_cloned = name.clone();
+                    let extension = &extension_cloned[raw_name.len() ..];
+                    to.clone() + extension
+                }
+                _ => {
+                    to.clone()
+                }
+            };
+
+            println!("new filename: {}", new_filename);
+
+            meta.actual_filename = Some(new_filename.clone());
+            fs::rename(Path::new("d/").join(name),
+                       Path::new("d/").join(&new_filename)).unwrap()
+        },
+        _ => ()
+    }
+
+    fs::remove_file(Path::new("d/").join(file + ".info.json")).unwrap();
+
+    let meta_string = match serde_json::to_string(&meta) {
+        Ok(val) => val,
+        Err(_) => return None
+    };
+
+    let target = to.split(".").next().unwrap().to_string();
+
+    let meta_filename = "d/".to_string() + &target + ".info.json";
+    let path = Path::new(&meta_filename);
+
+    let mut meta_file = match File::create(&path) {
+        Err(why) => {
+            println!("Couldn't create {}: {}",
+                     meta_filename,
+                     why.description());
+            return None;
+        },
+        Ok(file) => file,
+    };
+
+    match meta_file.write_all(meta_string.as_bytes()) {
+        Err(why) => {
+            println!("Failed to write to {}: {}", meta_filename,
+                     why.description());
+            return None;
+        },
+        Ok(_) => println!("successfully wrote to {}", meta_filename),
+    }
+
+    Some(format!("Renamed"))
 }
 
 enum FileResponseType {
@@ -526,6 +598,7 @@ fn main() {
         .manage(Mutex::new(sessions))
         .mount("/upload", routes![upload, upload_no_auth])
         .mount("/delete", routes![delete_file])
+        .mount("/rename", routes![rename_file])
         .mount("/", routes![get_pushed_file, homepage, manage,
          login, logout, static_files])
         .attach(Template::fairing())

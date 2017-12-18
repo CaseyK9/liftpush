@@ -18,9 +18,15 @@
             <div class="col s12 m8">
                 <ul class="collection">
                     {{#each files as |f| ~}}
-                        <li class="collection-item" data-name="{{ f.actual_filename }}"
-                            data-upload-name="{{ f.filename }}" data-type="{{ f.type }}">
-                            {{ f.actual_filename }}
+                        <li class="collection-item" data-url="{{ f.name }}"
+                            data-target="{{ f.meta.url }}"
+                            data-name="{{ f.meta.actual_filename }}"
+                            data-upload-name="{{ f.meta.filename }}" data-type="{{ f.meta.type }}">
+                            {{#if f.meta.actual_filename}}
+                                {{ f.meta.actual_filename }}
+                            {{else}}
+                                {{ f.name }} &rarr; {{ f.meta.url }}
+                            {{/if}}
                         </li>
                     {{/each~}}
                 </ul>
@@ -36,6 +42,7 @@
                     <div class="card-action">
                         <a href="#deleteModal" class="red-text modal-trigger">Delete</a>
                         <a href="#" target="_blank" id="file-open">Open</a>
+                        <a href="#renameModal" class="modal-trigger">Rename</a>
                     </div>
                 </div>
             </div>
@@ -54,6 +61,22 @@
         <a href="#!" class="modal-action modal-close waves-effect waves-green btn-flat">Cancel</a>
         <a href="#!" id="delete-file-button"
            class="modal-action modal-close waves-effect waves-red btn-flat red-text">OK</a>
+    </div>
+</div>
+
+<div id="renameModal" class="modal">
+    <div class="modal-content">
+        <h4>Rename file</h4>
+        <p>Rename <span id="rename-modal-name"></span> to what?</p>
+        <div class="input-field">
+            <input id="rename-modal-target" type="text" class="validate">
+            <label for="rename-modal-target">New Name (excluding extension)</label>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <a href="#!" class="modal-action modal-close waves-effect waves-green btn-flat">Cancel</a>
+        <a href="#!" id="rename-file-button"
+           class="modal-action modal-close waves-effect waves-green btn-flat green-text">OK</a>
     </div>
 </div>
 
