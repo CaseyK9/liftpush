@@ -511,7 +511,7 @@ struct TextView {
 
 #[get("/<file>", rank = 3)]
 fn get_pushed_file(file: String) -> Option<FileResponseType> {
-    if file.contains(".") || file.contains("/") || file.contains("\\") {
+    if file.contains("..") || file.contains("/") || file.contains("\\") {
         return None;
     }
 

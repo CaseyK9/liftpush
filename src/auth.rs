@@ -101,7 +101,7 @@ impl<'a, 'r> FromRequest<'a, 'r>  for User {
         let config : State<Mutex<SessionStore>> = match request.guard() {
             Success(config) => config,
             _ => return Failure((Status::ServiceUnavailable, ()))
-        };
+    };
 
         // Check for cookie
         let api_key = request.cookies().get_private(LOGIN_COOKIE);
