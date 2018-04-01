@@ -20,6 +20,8 @@ extern crate phf;
 
 extern crate chrono;
 
+extern crate mime_guess;
+
 mod assets;
 mod auth;
 mod io;
@@ -34,6 +36,7 @@ use rocket::http::ContentType;
 use rocket::http::Cookie;
 use rocket::http::Cookies;
 use rocket::State;
+use rocket::Response;
 
 use rocket_contrib::Template;
 use rocket_contrib::Json;
@@ -488,7 +491,7 @@ fn rename_file(_user : User, file: String, to : String) -> Option<String> {
 }
 
 enum FileResponseType {
-    File { file : NamedFile },
+    File { file : NamedFile, content : ContentType, file_name : String },
     Redir { redir : Redirect },
     Template { template : Template }
 }
@@ -496,7 +499,12 @@ enum FileResponseType {
 impl<'r> Responder<'r> for FileResponseType {
     fn respond_to(self, req: &Request) -> response::Result<'r> {
         match self {
-            FileResponseType::File { file } => file.respond_to(req),
+            FileResponseType::File { file, content, file_name } => Response::build()
+                    .sized_body(file)
+                    .raw_header("Content-Deposition", format!("inline; filename=\"{}\"", file_name))
+                    .header(content)
+                    .finalize()
+                    .respond_to(req),
             FileResponseType::Redir { redir } => redir.respond_to(req),
             FileResponseType::Template { template } => template.respond_to(req)
         }
@@ -520,9 +528,14 @@ fn get_pushed_file(file: String) -> Option<FileResponseType> {
     match meta.file_type {
         FileType::File => {
             match NamedFile::open(Path::new("d/").join(meta.actual_filename.unwrap())).ok() {
-                Some(file) => Some(FileResponseType::File {
-                    file
-                }),
+                Some(file) => Some(
+                    FileResponseType::File {
+                        file,
+                        content: ContentType::from(mime_guess::guess_mime_type(Path::new("d/")
+                            .join(meta.filename.clone().unwrap()))),
+                        file_name: meta.filename.clone().unwrap(),
+                    }
+                ),
                 _ => None
             }
         },

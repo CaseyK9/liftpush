@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["James <jselby@jselby.net>"]
 
 [dependencies]
-rocket = "0.3.4"
-rocket_codegen = "0.3.4"
+rocket = "0.3.6"
+rocket_codegen = "0.3.6"
 
 serde = "*"
 serde_derive = "*"
@@ -20,6 +20,8 @@ base64 = "0.8.0"
 includedir = "0.2.0"
 phf = "0.7.12"
 
+mime_guess = "1.8.4"
+
 [dependencies.uuid]
 version = "0.5"
 features = ["v4"]
@@ -29,7 +31,7 @@ version = "0.4.0"
 features = ["serde"]
 
 [dependencies.rocket_contrib]
-version = "0.3.4"
+version = "0.3.6"
 default-features = false
 features = ["json", "handlebars_templates"]
 
