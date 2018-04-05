@@ -501,7 +501,7 @@ impl<'r> Responder<'r> for FileResponseType {
         match self {
             FileResponseType::File { file, content, file_name } => Response::build()
                     .sized_body(file)
-                    .raw_header("Content-Deposition", format!("inline; filename=\"{}\"", file_name))
+                    .raw_header("Content-Deposition", format!("filename=\"{}\"", file_name))
                     .header(content)
                     .finalize()
                     .respond_to(req),
