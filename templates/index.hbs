@@ -1,4 +1,8 @@
-{{> header title="Login" }}
+{{#*inline "additionalAttrs"}}
+    class='has-navbar-fixed-top'
+{{/inline}}
+
+{{> header title="Login" bodyAttrs="additionalAttrs" }}
 
 <nav class="navbar is-info is-fixed-top" role="navigation" aria-label="main navigation">
     <div class="container">
@@ -50,5 +54,4 @@
     </div>
 </div>
 
-{{> scripts }}
 {{> footer }}

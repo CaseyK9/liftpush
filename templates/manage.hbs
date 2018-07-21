@@ -1,4 +1,8 @@
-{{> header title="Manage" }}
+{{#*inline "additionalAttrs"}}
+    class='has-navbar-fixed-top'
+{{/inline}}
+
+{{> header title="Manage" bodyAttrs="additionalAttrs" }}
 
 <nav class="navbar is-info is-fixed-top" role="navigation" aria-label="main navigation">
     <div class="container">
@@ -126,8 +130,6 @@
         </div>
     </transition>
 </div>
-
-{{> scripts }}
 
 <script type="text/javascript" src="js/vue.js"></script>
 <script type="text/javascript" src="js/manage.js"></script>

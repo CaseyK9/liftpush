@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" {{> (htmlAttrs) }}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
@@ -12,4 +12,4 @@
 
     {{> (headers) }}
 </head>
-<body class="has-navbar-fixed-top">
+<body {{> (bodyAttrs) }}>

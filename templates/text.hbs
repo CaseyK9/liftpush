@@ -2,45 +2,53 @@
     <link type="text/css" rel="stylesheet" href="css/agate.css"  media="screen,projection"/>
 
     <style>
-        body {
+        .main-code {
             background: #333;
         }
 
-        code {
+        .main-code code {
+            background: transparent !important;
+            color: white;
+            display: inline;
+        }
+
+        .main-code pre {
+            background: transparent !important;
             padding: 1.5rem !important;
         }
 
-        pre {
-            margin: 0;
-            width: 75%;
+        .fill-height {
             min-height: 100%;
+            max-height: 100%;
         }
 
-        .padded-box {
-            padding: 1rem;
-            position: fixed;
-            left: 75%;
-            width: 25%;
+        .max-height {
             height: 100%;
-            background: #fff;
         }
     </style>
 {{/inline}}
 
-{{> header title=meta.filename headers="additionalStyles" }}
+{{#*inline "additionalAttrs"}}
+    class='max-height'
+{{/inline}}
 
-<div class="padded-box">
-    <h3>{{ meta.filename }}</h3>
-    <h6>Uploaded: {{ meta.date }}</h6>
-    <h6>
-        <label for="link-box">Link: </label>
-        <input id="link-box" type="text" readonly onclick="focus();select();" value="{{ url }}"/>
-    </h6>
+{{> header title=meta.filename headers="additionalStyles" htmlAttrs="additionalAttrs" bodyAttrs="additionalAttrs" }}
+
+<div class="columns is-marginless fill-height">
+    <div class="column is-two-thirds is-paddingless main-code fill-height">
+        <pre class="fill-height"><code class="fill-height">{{ contents }}</code></pre>
+    </div>
+    <div class="column is-sticky">
+        <div class="subtitle is-4 is-marginless">{{ meta.filename }}</div>
+        <div class="subtitle is-6">Uploaded: {{ meta.date }}</div>
+        <div>
+            <label for="link-box">Link: </label>
+            <div class="control">
+                <input class="input" type="text" readonly onclick="focus();select();" value="{{ url }}"/>
+            </div>
+        </div>
+    </div>
 </div>
-
-<pre><code>{{ contents }}</code></pre>
-
-{{> scripts }}
 
 <script type="text/javascript" src="js/highlight.pack.js"></script>
 <script>hljs.initHighlightingOnLoad();</script>
