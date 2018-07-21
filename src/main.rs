@@ -71,8 +71,8 @@ use iron::status;
 use iron::Url;
 use params::Value;
 
-use types::StringError;
 use types::FileMetadata;
+use types::StringError;
 
 use routes::auth::login;
 use routes::auth::logout;
@@ -117,36 +117,6 @@ impl FileMetadata {
             filename: None,
             actual_filename: None,
             url: Some(url),
-        }
-    }
-}
-
-fn parse_meta(file: &str) -> Option<FileMetadata> {
-    let meta_filename = "d/".to_string() + file + ".info.json";
-    let path = Path::new(&meta_filename);
-    let mut meta_file = match File::open(&path) {
-        Err(_) => {
-            println!("File {} doesn't exist!", file);
-            return None;
-        }
-        Ok(file) => file,
-    };
-
-    let mut meta_string = String::new();
-    match meta_file.read_to_string(&mut meta_string) {
-        Err(_) => {
-            println!("File {} is unreadable!", file);
-            return None;
-        }
-        Ok(_) => (),
-    }
-
-    let meta: serde_json::Result<FileMetadata> = serde_json::from_str(&meta_string);
-    match meta {
-        Ok(meta) => Some(meta),
-        Err(why) => {
-            println!("File {} is not parsable: {}", file, why.description());
-            return None;
         }
     }
 }
@@ -394,6 +364,12 @@ pub struct FileViewerState {
 }
 
 fn manage(req: &mut Request) -> IronResult<Response> {
+    let base_path = {
+        let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
+        let config = arc.as_ref();
+        config.base_path.to_owned()
+    };
+
     let user = req.extensions.get::<SessionKey>().ok_or_else(|| {
         IronError::new(
             StringError("User attempted to access restricted page".into()),
@@ -412,11 +388,15 @@ fn manage(req: &mut Request) -> IronResult<Response> {
 
         if filename.ends_with(".info.json") {
             let name: &str = filename.split(".").next().unwrap();
-            if let Some(meta) = parse_meta(name) {
-                found_files.push(ManageMetadata {
-                    name: name.to_string(),
-                    meta,
-                });
+
+            match FileMetadata::from_path(&base_path, &name) {
+                Ok(meta) => {
+                    found_files.push(ManageMetadata {
+                        name: name.to_string(),
+                        meta,
+                    });
+                }
+                Err(v) => eprintln!("Failed to open file {:?}: {:?}", filename, v),
             }
         }
     }
@@ -436,6 +416,12 @@ fn manage(req: &mut Request) -> IronResult<Response> {
 }
 
 fn delete_file(req: &mut Request) -> IronResult<Response> {
+    let base_path = {
+        let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
+        let config = arc.as_ref();
+        config.base_path.to_owned()
+    };
+
     let file = req
         .extensions
         .get::<Router>()
@@ -452,10 +438,12 @@ fn delete_file(req: &mut Request) -> IronResult<Response> {
         return Ok(Response::with(status::NotFound));
     }
 
-    let meta = match parse_meta(&file) {
-        Some(v) => v,
-        None => return Ok(Response::with(status::NotFound)),
-    };
+    let meta = FileMetadata::from_path(&base_path, &file).map_err(|x| {
+        IronError::new(
+            StringError(x),
+            (status::NotFound, "Failed to find metadata"),
+        )
+    })?;
 
     match meta.actual_filename {
         Some(name) => fs::remove_file(Path::new("d/").join(name)).unwrap(),
@@ -468,6 +456,12 @@ fn delete_file(req: &mut Request) -> IronResult<Response> {
 }
 
 fn rename_file(req: &mut Request) -> IronResult<Response> {
+    let base_path = {
+        let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
+        let config = arc.as_ref();
+        config.base_path.to_owned()
+    };
+
     let router = req.extensions.get::<Router>().unwrap();
 
     let file = router.find("source").ok_or_else(|| {
@@ -488,16 +482,18 @@ fn rename_file(req: &mut Request) -> IronResult<Response> {
         return Ok(Response::with(status::NotFound));
     }
 
-    let mut meta = match parse_meta(&file) {
-        Some(v) => v,
-        None => return Ok(Response::with(status::NotFound)),
-    };
+    let mut meta = FileMetadata::from_path(&base_path, &file).map_err(|x| {
+        IronError::new(
+            StringError(x),
+            (status::NotFound, "Failed to find metadata"),
+        )
+    })?;
 
     if to.contains(".") || to.contains("/") || to.contains("\\") {
         return Ok(Response::with(status::NotFound));
     }
 
-    match meta.actual_filename {
+    match meta.actual_filename.take() {
         Some(name) => {
             let new_filename = match name.split(".").next() {
                 Some(raw_name) => {
@@ -598,6 +594,12 @@ fn get_static_file(filename: &str) -> Option<(Vec<u8>, mime::Mime)> {
 }
 
 fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
+    let base_path = {
+        let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
+        let config = arc.as_ref();
+        config.base_path.to_owned()
+    };
+
     let path = req
         .extensions
         .get::<Router>()
@@ -621,10 +623,12 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
         return Ok(Response::with(status::NotFound));
     }
 
-    let meta = match parse_meta(&path) {
-        Some(v) => v,
-        _ => return Ok(Response::with(status::NotFound)),
-    };
+    let meta = FileMetadata::from_path(&base_path, &path).map_err(|x| {
+        IronError::new(
+            StringError(x),
+            (status::NotFound, "Failed to find metadata"),
+        )
+    })?;
 
     match meta.file_type {
         FileType::File => {

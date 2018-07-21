@@ -2,11 +2,17 @@
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use std::path::PathBuf;
 
 use iron::IronError;
 
 use chrono::DateTime;
 use chrono::FixedOffset;
+
+use serde_json;
 
 /// Used for representing generic String errors as IronErrors.
 #[derive(Debug)]
@@ -47,16 +53,16 @@ mod metadata_rfc2822 {
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(date: &DateTime<FixedOffset>, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         let s = date.to_rfc2822();
         serializer.serialize_str(&s)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<FixedOffset>, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
         DateTime::parse_from_rfc2822(&s).map_err(serde::de::Error::custom)
@@ -85,4 +91,32 @@ pub struct FileMetadata {
     /// The original filename the user specified.
     /// If this is a file filetype, this is required.
     pub actual_filename: Option<String>,
+}
+
+impl FileMetadata {
+    /// Parses some FileMetadata from a specified <root>/<name>.info.json file.
+    pub fn from_path(root: &str, name: &str) -> Result<FileMetadata, String> {
+        let mut path = PathBuf::from(root);
+        path.push(name.to_string() + ".info.json");
+
+        if !path.exists() {
+            return Err(format!("File {} doesn't exist!", name));
+        }
+
+        let mut meta_file = match File::open(&path) {
+            Ok(file) => file,
+            Err(e) => return Err(format!("File {} couldn't be opened: {:?}", name, e)),
+        };
+
+        let mut meta_string = String::new();
+        match meta_file.read_to_string(&mut meta_string) {
+            Ok(_) => (),
+            Err(e) => return Err(format!("File {} couldn't be read: {:?}", name, e)),
+        }
+
+        match serde_json::from_str(&meta_string) {
+            Ok(meta) => Ok(meta),
+            Err(e) => Err(format!("File {} couldn't be parsed: {:?}", name, e)),
+        }
+    }
 }

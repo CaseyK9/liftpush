@@ -21,6 +21,7 @@ pub struct UserCredentials {
 #[derive(Deserialize)]
 pub struct Config {
     pub base_url: String,
+    pub base_path: String,
     pub api_keys: Vec<APIKey>,
     pub users: Vec<UserCredentials>,
     pub key: String,
