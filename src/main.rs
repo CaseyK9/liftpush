@@ -26,6 +26,7 @@ mod assets;
 mod auth;
 mod config;
 mod io;
+mod routes;
 mod types;
 
 use iron::headers::ContentDisposition;
@@ -70,6 +71,9 @@ use iron::status;
 use iron::Url;
 use params::Value;
 use types::StringError;
+
+use routes::auth::login;
+use routes::auth::logout;
 
 #[derive(Serialize)]
 struct UploadStatus {
@@ -429,95 +433,6 @@ fn upload(req: &mut Request) -> IronResult<Response> {
         status::Ok,
         response,
         Mime(TopLevel::Application, SubLevel::Json, Vec::new()),
-    )))
-}
-
-fn login(req: &mut Request) -> IronResult<Response> {
-    let (username, password) = {
-        let map = req.get_ref::<Params>().unwrap();
-        let username = map.get("username").ok_or_else(|| {
-            IronError::new(
-                StringError("Unable to find username in submitted form".into()),
-                (status::BadRequest, "Missing form params"),
-            )
-        })?;
-
-        let username = match username {
-            &Value::String(ref str) => str,
-            _ => {
-                return Err(IronError::new(
-                    StringError("Username isn't a string!".into()),
-                    (status::BadRequest, "Bad form params"),
-                ))
-            }
-        };
-
-        let password_str = map.get("password").ok_or_else(|| {
-            IronError::new(
-                StringError("Unable to find username in submitted form".into()),
-                (status::BadRequest, "Missing form params"),
-            )
-        })?;
-
-        let password_str = match password_str {
-            &Value::String(ref str) => str,
-            _ => {
-                return Err(IronError::new(
-                    StringError("Password isn't a string!".into()),
-                    (status::BadRequest, "Bad form params"),
-                ))
-            }
-        };
-
-        let mut password = sha2::Sha256::default();
-        password.input(password_str.as_bytes());
-        let password = password.result();
-        let password = base64::encode(&password);
-
-        (username.to_string(), password)
-    };
-
-    println!("User: {}, password: {}", username, password);
-
-    let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
-    let config = arc.as_ref();
-
-    // Find target user
-    let mut found = false;
-
-    for potential_user in &config.users {
-        if potential_user.username == username {
-            if potential_user.password == password {
-                found = true;
-            }
-            break;
-        }
-    }
-
-    println!("Found? {}", found);
-
-    if found {
-        req.extensions.remove::<SessionKey>();
-        req.extensions.insert::<SessionKey>(User { username });
-
-        Ok(Response::with((
-            status::Found,
-            RedirectRaw("manage".to_string()),
-        )))
-    } else {
-        Ok(Response::with((
-            status::Found,
-            RedirectRaw(".?error=invalid-login".to_string()),
-        )))
-    }
-}
-
-fn logout(req: &mut Request) -> IronResult<Response> {
-    req.extensions.remove::<SessionKey>();
-
-    Ok(Response::with((
-        status::Found,
-        RedirectRaw(".".to_string()),
     )))
 }
 

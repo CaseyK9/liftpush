@@ -1,5 +1,6 @@
 //! Generic helper types.
 
+use iron::IronError;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 
