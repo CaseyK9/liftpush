@@ -1,6 +1,6 @@
 //! Contains the management endpoint + types.
 
-use ConfigContainer;
+use config::ConfigContainer;
 
 use auth::SessionStore;
 

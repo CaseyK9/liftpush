@@ -1,6 +1,6 @@
 //! Contains the endpoint for browsing static and uploaded files + helpers.
 
-use ConfigContainer;
+use config::ConfigContainer;
 
 use types::FileMetadata;
 use types::FileType;

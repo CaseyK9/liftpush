@@ -1,12 +1,12 @@
 //! The main entrypoint for the application. Contains the main function for initialisation
 //! of the webserver.
 
+extern crate handlebars_iron;
 extern crate iron;
 extern crate params;
 extern crate persistent;
 extern crate router;
 extern crate secure_session;
-extern crate handlebars_iron;
 
 #[macro_use]
 extern crate serde_derive;
@@ -29,12 +29,14 @@ mod auth;
 mod config;
 mod io;
 mod routes;
+mod splitter;
 mod types;
 
 use auth::*;
 use io::*;
 
 use config::Config;
+use config::ConfigContainer;
 
 use routes::auth::login;
 use routes::auth::logout;
@@ -45,10 +47,11 @@ use routes::modify::delete_file;
 use routes::modify::rename_file;
 use routes::upload::upload;
 
-use iron::prelude::*;
-use iron::typemap::Key;
-use iron::AroundMiddleware;
+use splitter::ChainSplit;
+
 use iron::method;
+use iron::prelude::*;
+use iron::AroundMiddleware;
 
 use router::Router;
 
@@ -58,17 +61,12 @@ use secure_session::session::ChaCha20Poly1305SessionManager;
 use handlebars_iron::DirectorySource;
 use handlebars_iron::HandlebarsEngine;
 
-#[derive(Copy, Clone)]
-struct ConfigContainer;
-
-impl Key for ConfigContainer {
-    type Value = Config;
-}
-
+/// The main entrypoint for the application.
 fn main() {
     let config = Config::from_file("config.json").expect("Unable to load configuration");
     let bind_addr = config.bind_addr.to_owned();
 
+    // Generate the crypto-key used for sessions, sourced from the configuration key.
     let mut key = [0 as u8; 32];
 
     let mut key_index = 0;
@@ -81,6 +79,7 @@ fn main() {
         key_index += 1;
     }
 
+    // Setup the middleware, consuming the main key.
     let manager = ChaCha20Poly1305SessionManager::<User>::from_key(key);
     let session_config = SessionConfig::default();
     let middleware =
@@ -89,16 +88,20 @@ fn main() {
             session_config,
         );
 
+    // Start the templating engine
     let mut hbse = HandlebarsEngine::new();
     hbse.add(Box::new(DirectorySource::new("./templates/", ".hbs")));
-
     hbse.reload().expect("Unable to load templates");
 
+    // Generate the RNG
     let phrases = PhraseGenerator::new(
         include_str!("../res/dictionary_adjectives.txt"),
         include_str!("../res/dictionary_nouns.txt"),
     );
 
+    // Build the primary router
+
+    // Authenticated endpoints - this sets a cookie, which could normally have privacy concerns.
     let mut router = Router::new();
     router.route(method::Get, "/", homepage, "homepage");
     router.route(method::Post, "/login", login, "login");
@@ -112,14 +115,32 @@ fn main() {
         "rename",
     );
     router.route(method::Post, "/upload/:type", upload, "upload");
-    router.route(method::Get, "/*", get_pushed_file, "generic_file_handler");
 
-    let mut chain = Chain::new(router);
+    // Non-authenticated endpoints - no cookies here.
+    let mut router_no_cookie = Router::new();
+    router_no_cookie.route(method::Get, "/*", get_pushed_file, "generic_file_handler");
+
+    // Splitter delegates between authenticated and non-authenticated endpoints.
+    let split = ChainSplit::new(
+        middleware.around(Box::new(router)),
+        router_no_cookie,
+        vec!["delete/", "upload/", "rename/"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        vec!["", "login", "logout", "manage"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+    );
+
+    // Final chain adds on general metadata.
+    let mut chain = Chain::new(split);
     chain.link(persistent::Read::<ConfigContainer>::both(config));
     chain.link(persistent::Read::<PhraseGeneratorContainer>::both(phrases));
     chain.link_after(hbse);
 
-    Iron::new(middleware.around(Box::new(chain)))
+    Iron::new(chain)
         .http(bind_addr)
-        .unwrap();
+        .expect("Unable to start up webserver");
 }

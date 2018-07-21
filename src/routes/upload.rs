@@ -1,6 +1,6 @@
 //! Hosts the upload API endpoint.
 
-use ConfigContainer;
+use config::ConfigContainer;
 
 use types::FileMetadata;
 use types::FileType;

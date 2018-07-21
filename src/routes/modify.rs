@@ -1,6 +1,6 @@
 //! Endpoints for interactive modification of files.
 
-use ConfigContainer;
+use config::ConfigContainer;
 
 use types::FileMetadata;
 use types::StringError;

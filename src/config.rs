@@ -1,9 +1,13 @@
+//! Contains structures for managing runtime configuration data.
+
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
 use serde_json;
+
+use iron::typemap::Key;
 
 /// API key used to programmatically upload files.
 #[derive(Deserialize)]
@@ -52,4 +56,12 @@ impl Config {
             Err(serde_error) => Err(serde_error.description().to_string()),
         }
     }
+}
+
+/// Container used when shipping around the configuration in the web application.
+#[derive(Copy, Clone)]
+pub struct ConfigContainer;
+
+impl Key for ConfigContainer {
+    type Value = Config;
 }

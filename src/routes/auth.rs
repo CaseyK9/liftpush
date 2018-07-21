@@ -1,6 +1,6 @@
 //! Interactive authentication endpoints.
 
-use ConfigContainer;
+use config::ConfigContainer;
 
 use auth::SessionStore;
 
