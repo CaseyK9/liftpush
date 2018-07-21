@@ -1,20 +1,18 @@
 use iron::headers::ContentType;
 use iron::prelude::*;
-
 use iron::status;
-use types::StringError;
 
-/*use rocket::Outcome::*;
-use rocket::State;
-use rocket::request::{Request, Outcome, FromRequest};
-use rocket::http::Status;
+use persistent;
+
+use types::StringError;
 
 use rand;
 use rand::Rng;
 
+use iron::typemap::Key;
 use std::iter::FromIterator;
 
-fn as_capital_case(input : &str) -> String {
+fn as_capital_case(input: &str) -> String {
     let mut result = String::new();
 
     if input.len() == 0 {
@@ -32,8 +30,8 @@ fn as_capital_case(input : &str) -> String {
 }
 
 pub struct PhraseGenerator {
-    adjectives : Vec<String>,
-    nouns : Vec<String>
+    adjectives: Vec<String>,
+    nouns: Vec<String>,
 }
 
 impl PhraseGenerator {
@@ -43,7 +41,7 @@ impl PhraseGenerator {
         let mut result = String::new();
 
         // TODO: Custom length
-        for _ in 0 .. 1 {
+        for _ in 0..1 {
             let adjectives_ptr = rng.gen_range(0, self.adjectives.len());
             result += &as_capital_case(&self.adjectives[adjectives_ptr]);
         }
@@ -54,83 +52,34 @@ impl PhraseGenerator {
         result
     }
 
-    pub fn new(adjectives : &str, nouns : &str) -> Self {
-        let adjectives : Vec<String> = Vec::from_iter(adjectives.split("\n").map(String::from));
-        let nouns : Vec<String> = Vec::from_iter(nouns.split("\n").map(String::from));
+    pub fn new(adjectives: &str, nouns: &str) -> Self {
+        let adjectives: Vec<String> = Vec::from_iter(adjectives.split("\n").map(String::from));
+        let nouns: Vec<String> = Vec::from_iter(nouns.split("\n").map(String::from));
 
-        Self {
-            adjectives, nouns
-        }
+        Self { adjectives, nouns }
     }
+}
+
+#[derive(Copy, Clone)]
+pub struct PhraseGeneratorContainer;
+
+impl Key for PhraseGeneratorContainer {
+    type Value = PhraseGenerator;
 }
 
 pub struct RandomFilename {
-    pub filename : String
+    pub filename: String,
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for RandomFilename {
-    type Error = ();
+impl RandomFilename {
+    pub fn from(req: &mut Request) -> IronResult<RandomFilename> {
+        let arc = req
+            .get::<persistent::Read<PhraseGeneratorContainer>>()
+            .unwrap();
+        let phrases = arc.as_ref();
 
-    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let phrases : State<PhraseGenerator> = match request.guard::<State<PhraseGenerator>>() {
-            Success(phrases) => phrases,
-            _ => return Failure((Status::ServiceUnavailable, ()))
-        };
-
-        Success(RandomFilename {
-            filename : phrases.generate()
-        })
-    }
-}*/
-
-pub struct MultipartBoundary {
-    pub boundary: String,
-}
-
-impl MultipartBoundary {
-    pub fn from(request: &mut Request) -> IronResult<MultipartBoundary> {
-        let content_type = request.headers.get::<ContentType>().ok_or_else(|| {
-            IronError::new(
-                StringError("Unable to find Content-Type header".into()),
-                (status::BadRequest, "Missing Content-Type header"),
-            )
-        })?;
-
-        println!("Content type: {:?}", content_type);
-
-        let mime = &content_type.0;
-        let boundary = mime.get_param("boundary").ok_or_else(|| {
-            IronError::new(
-                StringError("Unable to find boundary section".into()),
-                (status::BadRequest, "Missing boundary section"),
-            )
-        })?;
-
-        println!("Boundary: {:?}", boundary);
-        Ok(MultipartBoundary {
-            boundary: format!("{:?}", boundary),
+        Ok(RandomFilename {
+            filename: phrases.generate(),
         })
     }
 }
-
-/*impl<'a, 'r> FromRequest<'a, 'r> for MultipartBoundary {
-    type Error = ();
-
-    fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let ct = match request.headers().get_one("Content-Type") {
-            Some(val) => val,
-            None => return Failure((Status::BadRequest, ()))
-        };
-
-        let idx = match ct.find("boundary=") {
-            Some(val) => val,
-            None => return Failure((Status::BadRequest, ()))
-        };
-
-        let boundary = ct[(idx + "boundary=".len())..].to_owned();
-
-        Success(MultipartBoundary {
-            boundary
-        })
-    }
-}*/
