@@ -70,66 +70,17 @@ use iron::modifiers::RedirectRaw;
 use iron::status;
 use iron::Url;
 use params::Value;
+
 use types::StringError;
+use types::FileMetadata;
 
 use routes::auth::login;
 use routes::auth::logout;
+use types::FileType;
 
 #[derive(Serialize)]
 struct UploadStatus {
     url: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-enum FileType {
-    File,
-    Url,
-    Text,
-}
-
-impl FileType {
-    fn from_str(name: &str) -> Option<FileType> {
-        match name {
-            "file" => Some(FileType::File),
-            "url" => Some(FileType::Url),
-            "text" => Some(FileType::Text),
-            _ => None,
-        }
-    }
-}
-
-#[allow(dead_code)]
-mod metadata_rfc2822 {
-    use chrono::{DateTime, FixedOffset};
-    use serde::{self, Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(date: &DateTime<FixedOffset>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let s = date.to_rfc2822();
-        serializer.serialize_str(&s)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<FixedOffset>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        DateTime::parse_from_rfc2822(&s).map_err(serde::de::Error::custom)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct FileMetadata {
-    #[serde(with = "metadata_rfc2822")]
-    date: DateTime<FixedOffset>, // Mon, 11 Dec 2017 10:28:36 +0000"
-    #[serde(rename = "type")]
-    file_type: FileType,
-    url: Option<String>,
-    filename: Option<String>,
-    actual_filename: Option<String>,
 }
 
 #[derive(Serialize)]

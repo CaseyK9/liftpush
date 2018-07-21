@@ -83,7 +83,7 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
         }
     }
 
-    // Respond appropiately
+    // Respond appropriately
     if found {
         // The user might have a previous session going
         req.extensions.remove::<SessionKey>();
