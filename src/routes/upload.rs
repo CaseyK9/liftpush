@@ -1,35 +1,32 @@
 //! Hosts the upload API endpoint.
 
 use ConfigContainer;
+use UploadStatus;
 
+use types::FileMetadata;
+use types::FileType;
 use types::StringError;
 
-use iron::prelude::*;
-use iron::status;
-use iron::Error;
-
 use io::RandomFilename;
-use params::Params;
-use params::Value;
-use persistent;
-use router::Router;
+
 use std::fs::copy;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-use types::FileMetadata;
-use types::FileType;
-use UploadStatus;
 
-use iron::headers::ContentDisposition;
-use iron::headers::DispositionParam;
-use iron::headers::DispositionType;
-use iron::mime::{self, Mime, SubLevel, TopLevel};
+use iron::mime::{Mime, SubLevel, TopLevel};
 use iron::prelude::*;
-use iron::typemap;
-use iron::typemap::Key;
-use iron::AroundMiddleware;
+use iron::status;
+use iron::Error;
+
+use params::Params;
+use params::Value;
+
+use persistent;
+
+use router::Router;
+
 use serde_json;
 
 /// Upload endpoint. Uploads a specified file for a user.

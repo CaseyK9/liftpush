@@ -4,14 +4,12 @@ use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
 use std::path::PathBuf;
-
-use iron::IronError;
 
 use chrono::DateTime;
 use chrono::FixedOffset;
 
+use chrono::Local;
 use serde_json;
 
 /// Used for representing generic String errors as IronErrors.
@@ -117,6 +115,39 @@ impl FileMetadata {
         match serde_json::from_str(&meta_string) {
             Ok(meta) => Ok(meta),
             Err(e) => Err(format!("File {} couldn't be parsed: {:?}", name, e)),
+        }
+    }
+
+    /// Creates a new FileMetadata for a generic file upload.
+    pub fn new_from_file(filename: String, actual_filename: String) -> FileMetadata {
+        FileMetadata {
+            date: Local::now().with_timezone(&FixedOffset::east(0)),
+            file_type: FileType::File,
+            filename: Some(filename),
+            actual_filename: Some(actual_filename),
+            url: None,
+        }
+    }
+
+    /// Creates a new FileMetadata for a text file upload.
+    pub fn new_from_text(filename: String, actual_filename: String) -> FileMetadata {
+        FileMetadata {
+            date: Local::now().with_timezone(&FixedOffset::east(0)),
+            file_type: FileType::Text,
+            filename: Some(filename),
+            actual_filename: Some(actual_filename),
+            url: None,
+        }
+    }
+
+    /// Creates a new FileMetadata for a url upload.
+    pub fn new_from_url(url: String) -> FileMetadata {
+        FileMetadata {
+            date: Local::now().with_timezone(&FixedOffset::east(0)),
+            file_type: FileType::Url,
+            filename: None,
+            actual_filename: None,
+            url: Some(url),
         }
     }
 }

@@ -38,8 +38,6 @@ use iron::typemap;
 use iron::typemap::Key;
 use iron::AroundMiddleware;
 
-use params::Params;
-
 use router::Router;
 
 use secure_session::middleware::{SessionConfig, SessionMiddleware};
@@ -47,15 +45,10 @@ use secure_session::session::ChaCha20Poly1305SessionManager;
 
 use std::error::Error;
 use std::fs;
-use std::fs::copy;
 use std::fs::DirEntry;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-
-use chrono::{DateTime, FixedOffset, Local};
-
-use sha2::Digest;
 
 use assets::FILES as files;
 use auth::*;
@@ -69,7 +62,6 @@ use iron::modifiers::Redirect;
 use iron::modifiers::RedirectRaw;
 use iron::status;
 use iron::Url;
-use params::Value;
 
 use types::FileMetadata;
 use types::StringError;
@@ -89,38 +81,6 @@ struct UploadStatus {
 struct ManageMetadata {
     name: String,
     meta: FileMetadata,
-}
-
-impl FileMetadata {
-    fn new_from_file(filename: String, actual_filename: String) -> Self {
-        Self {
-            date: Local::now().with_timezone(&FixedOffset::east(0)),
-            file_type: FileType::File,
-            filename: Some(filename),
-            actual_filename: Some(actual_filename),
-            url: None,
-        }
-    }
-
-    fn new_from_text(filename: String, actual_filename: String) -> Self {
-        Self {
-            date: Local::now().with_timezone(&FixedOffset::east(0)),
-            file_type: FileType::Text,
-            filename: Some(filename),
-            actual_filename: Some(actual_filename),
-            url: None,
-        }
-    }
-
-    fn new_from_url(url: String) -> Self {
-        Self {
-            date: Local::now().with_timezone(&FixedOffset::east(0)),
-            file_type: FileType::Url,
-            filename: None,
-            actual_filename: None,
-            url: Some(url),
-        }
-    }
 }
 
 #[derive(Serialize)]
