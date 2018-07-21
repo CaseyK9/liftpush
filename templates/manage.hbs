@@ -85,7 +85,7 @@
     </div>
 
     <transition name="fade">
-        <div class="modal is-active" v-if="showDelete">
+        <div class="modal" :class="{'is-active': true}" v-if="showDelete">
             <div class="modal-background" v-on:click="showDelete = false"></div>
             <div class="modal-card">
                 <header class="modal-card-head">
@@ -103,7 +103,7 @@
     </transition>
 
     <transition name="fade">
-        <div class="modal is-active" v-if="showRename">
+        <div class="modal" :class="{'is-active': true}" v-if="showRename">
             <div class="modal-background" v-on:click="showRename = false"></div>
             <div class="modal-card">
                 <header class="modal-card-head">
