@@ -1,7 +1,8 @@
 //! Interactive authentication endpoints.
 
 use ConfigContainer;
-use SessionKey;
+
+use auth::SessionStore;
 
 use types::StringError;
 
@@ -25,7 +26,7 @@ use persistent;
 ///
 /// HTTP request required state:
 ///     Request kind: POST, with key-value pairs of username and password
-///     Headers: optional SessionKey
+///     Headers: optional SessionStore
 pub fn login(req: &mut Request) -> IronResult<Response> {
     // Grab the username and password from the POST request
     let (username, password) = {
@@ -64,8 +65,8 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
     // Respond appropriately
     if found {
         // The user might have a previous session going
-        req.extensions.remove::<SessionKey>();
-        req.extensions.insert::<SessionKey>(User { username });
+        req.extensions.remove::<SessionStore>();
+        req.extensions.insert::<SessionStore>(User { username });
 
         Ok(Response::with((
             status::Found,
@@ -84,10 +85,10 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
 ///
 /// HTTP request required state:
 ///     Request kind: GET
-///     Headers: optional SessionKey
+///     Headers: optional SessionStore
 pub fn logout(req: &mut Request) -> IronResult<Response> {
-    // This returns an Option type, so no SessionKey will be a no-op here.
-    req.extensions.remove::<SessionKey>();
+    // This returns an Option type, so no SessionStore will be a no-op here.
+    req.extensions.remove::<SessionStore>();
 
     Ok(Response::with((
         status::Found,

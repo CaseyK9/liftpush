@@ -1,7 +1,8 @@
 //! Contains the management endpoint + types.
 
 use ConfigContainer;
-use SessionKey;
+
+use auth::SessionStore;
 
 use types::FileMetadata;
 use types::StringError;
@@ -34,7 +35,7 @@ pub struct FileViewerState {
 ///
 /// HTTP request required state:
 ///     Request kind: GET
-///     Headers: required SessionKey
+///     Headers: required SessionStore
 pub fn manage(req: &mut Request) -> IronResult<Response> {
     let base_path = {
         let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
@@ -42,7 +43,7 @@ pub fn manage(req: &mut Request) -> IronResult<Response> {
         config.base_path.to_owned()
     };
 
-    let user = req.extensions.get::<SessionKey>().ok_or_else(|| {
+    let user = req.extensions.get::<SessionStore>().ok_or_else(|| {
         IronError::new(
             StringError("User attempted to access restricted page".into()),
             (status::Unauthorized, "You are not logged in"),

@@ -24,7 +24,7 @@ use serde_json;
 ///
 /// HTTP request required state:
 ///     Request kind: GET, with filename as part of path
-///     Headers: required SessionKey
+///     Headers: required SessionStore
 pub fn delete_file(req: &mut Request) -> IronResult<Response> {
     let base_path = {
         let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
@@ -69,7 +69,7 @@ pub fn delete_file(req: &mut Request) -> IronResult<Response> {
 ///
 /// HTTP request required state:
 ///     Request kind: GET, with source + target as part of path
-///     Headers: required SessionKey
+///     Headers: required SessionStore
 pub fn rename_file(req: &mut Request) -> IronResult<Response> {
     let base_path = {
         let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();

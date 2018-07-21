@@ -12,7 +12,6 @@ extern crate serde_json;
 extern crate base64;
 extern crate rand;
 extern crate sha2;
-extern crate uuid;
 
 extern crate includedir;
 extern crate phf;
@@ -29,22 +28,10 @@ mod io;
 mod routes;
 mod types;
 
-use iron::prelude::*;
-use iron::typemap;
-use iron::typemap::Key;
-use iron::AroundMiddleware;
-
-use router::Router;
-
-use secure_session::middleware::{SessionConfig, SessionMiddleware};
-use secure_session::session::ChaCha20Poly1305SessionManager;
-
 use auth::*;
-use config::Config;
-use handlebars_iron::DirectorySource;
-use handlebars_iron::HandlebarsEngine;
 use io::*;
-use iron::method;
+
+use config::Config;
 
 use routes::auth::login;
 use routes::auth::logout;
@@ -55,17 +42,24 @@ use routes::modify::delete_file;
 use routes::modify::rename_file;
 use routes::upload::upload;
 
+use iron::prelude::*;
+use iron::typemap::Key;
+use iron::AroundMiddleware;
+use iron::method;
+
+use router::Router;
+
+use secure_session::middleware::{SessionConfig, SessionMiddleware};
+use secure_session::session::ChaCha20Poly1305SessionManager;
+
+use handlebars_iron::DirectorySource;
+use handlebars_iron::HandlebarsEngine;
+
 #[derive(Copy, Clone)]
 struct ConfigContainer;
 
 impl Key for ConfigContainer {
     type Value = Config;
-}
-
-struct SessionKey {}
-
-impl typemap::Key for SessionKey {
-    type Value = User;
 }
 
 fn main() {
@@ -86,7 +80,7 @@ fn main() {
     let manager = ChaCha20Poly1305SessionManager::<User>::from_key(key);
     let session_config = SessionConfig::default();
     let middleware =
-        SessionMiddleware::<User, SessionKey, ChaCha20Poly1305SessionManager<User>>::new(
+        SessionMiddleware::<User, SessionStore, ChaCha20Poly1305SessionManager<User>>::new(
             manager,
             session_config,
         );

@@ -1,6 +1,6 @@
 //! Contains the homepage endpoint.
 
-use SessionKey;
+use auth::SessionStore;
 
 use iron::modifiers::RedirectRaw;
 use iron::prelude::*;
@@ -13,9 +13,9 @@ use handlebars_iron::Template;
 ///
 /// HTTP request required state:
 ///     Request kind: GET
-///     Headers: optional SessionKey
+///     Headers: optional SessionStore
 pub fn homepage(req: &mut Request) -> IronResult<Response> {
-    if req.extensions.get::<SessionKey>().is_some() {
+    if req.extensions.get::<SessionStore>().is_some() {
         return Ok(Response::with((
             status::Found,
             RedirectRaw("manage".to_string()),
