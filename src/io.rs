@@ -1,10 +1,6 @@
-use iron::headers::ContentType;
 use iron::prelude::*;
-use iron::status;
 
 use persistent;
-
-use types::StringError;
 
 use rand;
 use rand::Rng;

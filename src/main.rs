@@ -33,9 +33,9 @@ use iron::headers::DispositionParam;
 use iron::headers::DispositionType;
 use iron::mime::{self, Mime, SubLevel, TopLevel};
 use iron::prelude::*;
+use iron::typemap;
 use iron::typemap::Key;
 use iron::AroundMiddleware;
-use iron::{typemap, AfterMiddleware, BeforeMiddleware};
 
 use params::Params;
 
@@ -51,7 +51,6 @@ use std::fs::DirEntry;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use chrono::{DateTime, FixedOffset, Local};
 
@@ -228,7 +227,7 @@ fn upload(req: &mut Request) -> IronResult<Response> {
             }
         }
 
-        if (!found) {
+        if !found {
             return Err(IronError::new(
                 StringError("Bad API key in submitted form".into()),
                 (status::BadRequest, "Bad API key"),
@@ -423,10 +422,14 @@ fn upload(req: &mut Request) -> IronResult<Response> {
     }
 
     let response = serde_json::to_string(&UploadStatus {
-        url: base_url + &url
+        url: base_url + &url,
     }).map_err(|x| IronError::new(x, (status::BadRequest, "Internal I/O error")))?;
 
-    Ok(Response::with((status::Ok, response, Mime(TopLevel::Application, SubLevel::Json, Vec::new()))))
+    Ok(Response::with((
+        status::Ok,
+        response,
+        Mime(TopLevel::Application, SubLevel::Json, Vec::new()),
+    )))
 }
 
 fn login(req: &mut Request) -> IronResult<Response> {
@@ -580,12 +583,12 @@ fn delete_file(req: &mut Request) -> IronResult<Response> {
         })?;
 
     if file.contains(".") || file.contains("/") || file.contains("\\") {
-        return Ok(Response::with((status::NotFound)));
+        return Ok(Response::with(status::NotFound));
     }
 
     let meta = match parse_meta(&file) {
         Some(v) => v,
-        None => return Ok(Response::with((status::NotFound))),
+        None => return Ok(Response::with(status::NotFound)),
     };
 
     match meta.actual_filename {
@@ -616,16 +619,16 @@ fn rename_file(req: &mut Request) -> IronResult<Response> {
     })?;
 
     if file.contains(".") || file.contains("/") || file.contains("\\") {
-        return Ok(Response::with((status::NotFound)));
+        return Ok(Response::with(status::NotFound));
     }
 
     let mut meta = match parse_meta(&file) {
         Some(v) => v,
-        None => return Ok(Response::with((status::NotFound))),
+        None => return Ok(Response::with(status::NotFound)),
     };
 
     if to.contains(".") || to.contains("/") || to.contains("\\") {
-        return Ok(Response::with((status::NotFound)));
+        return Ok(Response::with(status::NotFound));
     }
 
     match meta.actual_filename {
@@ -654,7 +657,7 @@ fn rename_file(req: &mut Request) -> IronResult<Response> {
 
     let meta_string = match serde_json::to_string(&meta) {
         Ok(val) => val,
-        Err(_) => return Ok(Response::with((status::NotFound))),
+        Err(_) => return Ok(Response::with(status::NotFound)),
     };
 
     let target = to.split(".").next().unwrap().to_string();
@@ -665,7 +668,7 @@ fn rename_file(req: &mut Request) -> IronResult<Response> {
     let mut meta_file = match File::create(&path) {
         Err(why) => {
             println!("Couldn't create {}: {}", meta_filename, why.description());
-            return Ok(Response::with((status::NotFound)));
+            return Ok(Response::with(status::NotFound));
         }
         Ok(file) => file,
     };
@@ -677,7 +680,7 @@ fn rename_file(req: &mut Request) -> IronResult<Response> {
                 meta_filename,
                 why.description()
             );
-            return Ok(Response::with((status::NotFound)));
+            return Ok(Response::with(status::NotFound));
         }
         Ok(_) => (),
     }
@@ -700,7 +703,7 @@ fn homepage(req: &mut Request) -> IronResult<Response> {
 struct TextView {
     contents: String,
     meta: FileMetadata,
-    url: String
+    url: String,
 }
 
 fn get_static_file(filename: &str) -> Option<(Vec<u8>, mime::Mime)> {
@@ -720,7 +723,7 @@ fn get_static_file(filename: &str) -> Option<(Vec<u8>, mime::Mime)> {
             };
 
             let mut buffer = Vec::new();
-            let size = file.read_to_end(&mut buffer).unwrap();
+            file.read_to_end(&mut buffer).unwrap();
 
             Some((buffer, content_type))
         }
@@ -734,7 +737,8 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
         .get::<Router>()
         .unwrap()
         .find("")
-        .unwrap_or("").to_owned();
+        .unwrap_or("")
+        .to_owned();
 
     // Firstly, see if this is a static file
     let file = get_static_file(&path);
@@ -748,12 +752,12 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
     }
 
     if path.contains("..") || path.contains("/") || path.contains("\\") {
-        return Ok(Response::with((status::NotFound)));
+        return Ok(Response::with(status::NotFound));
     }
 
     let meta = match parse_meta(&path) {
         Some(v) => v,
-        _ => return Ok(Response::with((status::NotFound))),
+        _ => return Ok(Response::with(status::NotFound)),
     };
 
     match meta.file_type {
@@ -775,7 +779,7 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
                 });
                 return Ok(response);
             } else {
-                return Ok(Response::with((status::NotFound)));
+                return Ok(Response::with(status::NotFound));
             }
         }
         FileType::Url => {
@@ -805,7 +809,7 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
             let mut meta_file = match File::open(&path) {
                 Err(_) => {
                     println!("File {:?} doesn't exist!", path);
-                    return Ok(Response::with((status::NotFound)));
+                    return Ok(Response::with(status::NotFound));
                 }
                 Ok(file) => file,
             };
@@ -814,7 +818,7 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
             match meta_file.read_to_string(&mut meta_string) {
                 Err(_) => {
                     println!("File {:?} is unreadable!", path);
-                    return Ok(Response::with((status::NotFound)));
+                    return Ok(Response::with(status::NotFound));
                 }
                 Ok(_) => (),
             }
@@ -826,7 +830,7 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
                     &TextView {
                         contents: meta_string,
                         meta,
-                        url
+                        url,
                     },
                 ),
             )));
@@ -880,7 +884,7 @@ fn main() {
         include_str!("../res/dictionary_nouns.txt"),
     );
 
-    let addr = "127.0.0.1:8080";
+    let addr = "127.0.0.1:3000";
 
     let mut router = Router::new();
     router.route(method::Get, "/", homepage, "homepage");
@@ -898,12 +902,11 @@ fn main() {
     router.route(method::Get, "/*", get_pushed_file, "generic_file_handler");
 
     let mut chain = Chain::new(router);
-    //chain.link_after(Custom404);
     chain.link(persistent::Read::<ConfigContainer>::both(config));
     chain.link(persistent::Read::<PhraseGeneratorContainer>::both(phrases));
     chain.link_after(hbse);
 
     Iron::new(middleware.around(Box::new(chain)))
-        .http("localhost:3000")
+        .http(addr)
         .unwrap();
 }
