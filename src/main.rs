@@ -27,13 +27,13 @@ extern crate mime_guess;
 mod assets;
 mod auth;
 mod config;
-mod io;
+mod rng;
 mod routes;
 mod splitter;
 mod types;
 
 use auth::*;
-use io::*;
+use rng::*;
 
 use config::Config;
 use config::ConfigContainer;

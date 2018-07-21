@@ -1,3 +1,5 @@
+//! Contains structures for the generation of random phrases/filenames.
+
 use iron::prelude::*;
 
 use persistent;
@@ -8,6 +10,7 @@ use rand::Rng;
 use iron::typemap::Key;
 use std::iter::FromIterator;
 
+/// Capitalises the first letter of an input string.
 fn as_capital_case(input: &str) -> String {
     let mut result = String::new();
 
@@ -25,12 +28,14 @@ fn as_capital_case(input: &str) -> String {
     result
 }
 
+/// Structure which generates phrases out of adjectives and nouns.
 pub struct PhraseGenerator {
     adjectives: Vec<String>,
     nouns: Vec<String>,
 }
 
 impl PhraseGenerator {
+    /// Generates a new string.
     fn generate(&self) -> String {
         let mut rng = rand::thread_rng();
 
@@ -48,14 +53,16 @@ impl PhraseGenerator {
         result
     }
 
-    pub fn new(adjectives: &str, nouns: &str) -> Self {
+    /// Creates a new PhraseGenerator.
+    pub fn new(adjectives: &str, nouns: &str) -> PhraseGenerator {
         let adjectives: Vec<String> = Vec::from_iter(adjectives.split("\n").map(String::from));
         let nouns: Vec<String> = Vec::from_iter(nouns.split("\n").map(String::from));
 
-        Self { adjectives, nouns }
+        PhraseGenerator { adjectives, nouns }
     }
 }
 
+/// Container uses as middleware during execution of the webserver.
 #[derive(Copy, Clone)]
 pub struct PhraseGeneratorContainer;
 
@@ -63,11 +70,13 @@ impl Key for PhraseGeneratorContainer {
     type Value = PhraseGenerator;
 }
 
+/// Result of a phrase generation.
 pub struct RandomFilename {
     pub filename: String,
 }
 
 impl RandomFilename {
+    /// Creates a new RandomFilename, taking it's context from a Request.
     pub fn from(req: &mut Request) -> IronResult<RandomFilename> {
         let arc = req
             .get::<persistent::Read<PhraseGeneratorContainer>>()

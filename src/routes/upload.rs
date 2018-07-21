@@ -6,7 +6,7 @@ use types::FileMetadata;
 use types::FileType;
 use types::StringError;
 
-use io::RandomFilename;
+use rng::RandomFilename;
 
 use std::fs::copy;
 use std::fs::File;
