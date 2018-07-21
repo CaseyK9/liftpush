@@ -23,6 +23,7 @@ macro_rules! extract_param_type {
 }
 
 pub mod auth;
+pub mod files;
 pub mod homepage;
 pub mod manage;
 pub mod modify;
