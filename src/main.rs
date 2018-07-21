@@ -126,6 +126,12 @@ fn upload(req: &mut Request) -> IronResult<Response> {
     /*(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file : RandomFilename,
     config : State<Config>, input_type : String)
     -> Result<Json<UploadStatus>, String> {*/
+    let base_path = {
+        let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
+        let config = arc.as_ref();
+        config.base_path.to_owned()
+    };
+
     // Verify API key
     let api_key = {
         let raw_key = req.headers.get_raw("X-API-Key").ok_or_else(|| {
@@ -245,7 +251,7 @@ fn upload(req: &mut Request) -> IronResult<Response> {
         FileType::File => {
             println!("Save file to {}", new_filename);
             // TODO: Check to make sure file doesn't exist
-            copy(file.path, "d/".to_string() + &new_filename).unwrap();
+            copy(file.path, base_path.to_string() + &new_filename).unwrap();
             FileMetadata::new_from_file(original_filename, new_filename.clone())
         }
         FileType::Text => {
@@ -264,7 +270,7 @@ fn upload(req: &mut Request) -> IronResult<Response> {
                 FileMetadata::new_from_url(data)
             } else {
                 // Save buffered text
-                let meta_filename = "d/".to_string() + &new_filename;
+                let meta_filename = base_path.to_string() + &new_filename;
                 let path = Path::new(&meta_filename);
 
                 let mut meta_file = match File::create(&path) {
@@ -317,7 +323,7 @@ fn upload(req: &mut Request) -> IronResult<Response> {
     };
 
     // Save metadata
-    let meta_filename = "d/".to_string() + &url + ".info.json";
+    let meta_filename = base_path.to_string() + &url + ".info.json";
     let path = Path::new(&meta_filename);
 
     let mut meta_file = match File::create(&path) {
@@ -446,11 +452,11 @@ fn delete_file(req: &mut Request) -> IronResult<Response> {
     })?;
 
     match meta.actual_filename {
-        Some(name) => fs::remove_file(Path::new("d/").join(name)).unwrap(),
+        Some(name) => fs::remove_file(Path::new(&base_path).join(name)).unwrap(),
         _ => {}
     }
 
-    fs::remove_file(Path::new("d/").join(format!("{}.info.json", file))).unwrap();
+    fs::remove_file(Path::new(&base_path).join(format!("{}.info.json", file))).unwrap();
 
     Ok(Response::with((status::Ok, "Deleted")))
 }
@@ -508,14 +514,14 @@ fn rename_file(req: &mut Request) -> IronResult<Response> {
 
             meta.actual_filename = Some(new_filename.clone());
             fs::rename(
-                Path::new("d/").join(name),
-                Path::new("d/").join(&new_filename),
+                Path::new(&base_path).join(name),
+                Path::new(&base_path).join(&new_filename),
             ).unwrap()
         }
         _ => (),
     }
 
-    fs::remove_file(Path::new("d/").join(format!("{}.info.json", file))).unwrap();
+    fs::remove_file(Path::new(&base_path).join(format!("{}.info.json", file))).unwrap();
 
     let meta_string = match serde_json::to_string(&meta) {
         Ok(val) => val,
@@ -524,7 +530,7 @@ fn rename_file(req: &mut Request) -> IronResult<Response> {
 
     let target = to.split(".").next().unwrap().to_string();
 
-    let meta_filename = "d/".to_string() + &target + ".info.json";
+    let meta_filename = base_path + &target + ".info.json";
     let path = Path::new(&meta_filename);
 
     let mut meta_file = match File::create(&path) {
@@ -632,7 +638,7 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
 
     match meta.file_type {
         FileType::File => {
-            let file = Path::new("d/").join(meta.actual_filename.unwrap());
+            let file = Path::new(&base_path).join(meta.actual_filename.unwrap());
 
             if file.exists() {
                 let content_type = mime_guess::guess_mime_type(&file);
@@ -674,7 +680,7 @@ fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
             let url = base_url + &path;
 
             // Read in text file
-            let meta_filename = "d/".to_string() + &meta.actual_filename.clone().unwrap();
+            let meta_filename = base_path.to_string() + &meta.actual_filename.clone().unwrap();
             let path = Path::new(&meta_filename);
             let mut meta_file = match File::open(&path) {
                 Err(_) => {
