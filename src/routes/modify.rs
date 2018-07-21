@@ -7,8 +7,8 @@ use types::StringError;
 
 use std::fs;
 use std::fs::File;
-use std::path::Path;
 use std::io::Write;
+use std::path::Path;
 
 use iron::prelude::*;
 use iron::status;
@@ -96,7 +96,7 @@ pub fn rename_file(req: &mut Request) -> IronResult<Response> {
     if file.contains(".") || file.contains("/") || file.contains("\\") {
         return Err(IronError::new(
             StringError(format!("Source path {:?} contains bad characters", file)),
-            status::NotFound
+            status::NotFound,
         ));
     }
 
@@ -110,7 +110,7 @@ pub fn rename_file(req: &mut Request) -> IronResult<Response> {
     if to.contains(".") || to.contains("/") || to.contains("\\") {
         return Err(IronError::new(
             StringError(format!("Target path {:?} contains bad characters", to)),
-            status::NotFound
+            status::NotFound,
         ));
     }
 

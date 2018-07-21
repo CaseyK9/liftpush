@@ -56,7 +56,6 @@ use handlebars_iron::Template;
 use io::*;
 use iron::method;
 use iron::modifiers::Redirect;
-use iron::modifiers::RedirectRaw;
 use iron::status;
 use iron::Url;
 
@@ -65,24 +64,13 @@ use types::StringError;
 
 use routes::auth::login;
 use routes::auth::logout;
-use routes::upload::upload;
+use routes::homepage::homepage;
 use routes::manage::manage;
 use routes::modify::delete_file;
 use routes::modify::rename_file;
+use routes::upload::upload;
 
 use types::FileType;
-
-
-fn homepage(req: &mut Request) -> IronResult<Response> {
-    if req.extensions.get::<SessionKey>().is_some() {
-        return Ok(Response::with((
-            status::Found,
-            RedirectRaw("manage".to_string()),
-        )));
-    }
-
-    Ok(Response::with((status::Ok, Template::new("index", {}))))
-}
 
 #[derive(Serialize)]
 struct TextView {
