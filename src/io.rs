@@ -1,4 +1,10 @@
-use rocket::Outcome::*;
+use iron::headers::ContentType;
+use iron::prelude::*;
+
+use iron::status;
+use types::StringError;
+
+/*use rocket::Outcome::*;
 use rocket::State;
 use rocket::request::{Request, Outcome, FromRequest};
 use rocket::http::Status;
@@ -75,13 +81,39 @@ impl<'a, 'r> FromRequest<'a, 'r> for RandomFilename {
             filename : phrases.generate()
         })
     }
-}
+}*/
 
 pub struct MultipartBoundary {
-    pub boundary : String
+    pub boundary: String,
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for MultipartBoundary {
+impl MultipartBoundary {
+    pub fn from(request: &mut Request) -> IronResult<MultipartBoundary> {
+        let content_type = request.headers.get::<ContentType>().ok_or_else(|| {
+            IronError::new(
+                StringError("Unable to find Content-Type header".into()),
+                (status::BadRequest, "Missing Content-Type header"),
+            )
+        })?;
+
+        println!("Content type: {:?}", content_type);
+
+        let mime = &content_type.0;
+        let boundary = mime.get_param("boundary").ok_or_else(|| {
+            IronError::new(
+                StringError("Unable to find boundary section".into()),
+                (status::BadRequest, "Missing boundary section"),
+            )
+        })?;
+
+        println!("Boundary: {:?}", boundary);
+        Ok(MultipartBoundary {
+            boundary: format!("{:?}", boundary),
+        })
+    }
+}
+
+/*impl<'a, 'r> FromRequest<'a, 'r> for MultipartBoundary {
     type Error = ();
 
     fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
@@ -101,4 +133,4 @@ impl<'a, 'r> FromRequest<'a, 'r> for MultipartBoundary {
             boundary
         })
     }
-}
+}*/

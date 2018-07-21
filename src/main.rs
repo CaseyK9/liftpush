@@ -1,54 +1,55 @@
-#![feature(plugin, decl_macro, custom_derive)]
-#![plugin(rocket_codegen)]
-extern crate rocket;
-extern crate rocket_contrib;
+extern crate iron;
+extern crate params;
+extern crate persistent;
+extern crate router;
+extern crate secure_session;
 
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
 
-extern crate multipart;
-
-extern crate rand;
-extern crate uuid;
-extern crate sha2;
 extern crate base64;
+extern crate rand;
+extern crate sha2;
+extern crate uuid;
 
 extern crate includedir;
 extern crate phf;
 
 extern crate chrono;
 
+extern crate handlebars_iron;
 extern crate mime_guess;
 
 mod assets;
 mod auth;
-mod io;
 mod config;
+mod io;
+mod types;
 
-use rocket::Data;
-use rocket::request::Form;
-use rocket::request::Request;
-use rocket::response;
-use rocket::response::{NamedFile, Content, Stream, Redirect, Responder};
-use rocket::http::ContentType;
-use rocket::http::Cookie;
-use rocket::http::Cookies;
-use rocket::State;
-use rocket::Response;
+use iron::headers::ContentDisposition;
+use iron::headers::DispositionParam;
+use iron::headers::DispositionType;
+use iron::mime::{self, Mime, SubLevel, TopLevel};
+use iron::prelude::*;
+use iron::typemap::Key;
+use iron::AroundMiddleware;
+use iron::{typemap, AfterMiddleware, BeforeMiddleware};
 
-use rocket_contrib::Template;
-use rocket_contrib::Json;
+use params::Params;
 
-use multipart::server::Multipart;
+use router::Router;
 
-use std::io::{Read, Write};
-use std::fs;
-use std::fs::File;
-use std::fs::DirEntry;
-use std::path::{Path, PathBuf};
+use secure_session::middleware::{SessionConfig, SessionMiddleware};
+use secure_session::session::ChaCha20Poly1305SessionManager;
+
 use std::error::Error;
+use std::fs;
+use std::fs::DirEntry;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use chrono::{DateTime, FixedOffset, Local};
@@ -57,12 +58,22 @@ use sha2::Digest;
 
 use assets::FILES as files;
 use auth::*;
-use io::*;
+//use io::*;
 use config::Config;
+use handlebars_iron::DirectorySource;
+use handlebars_iron::HandlebarsEngine;
+use handlebars_iron::Template;
+use iron::method;
+use iron::modifiers::Redirect;
+use iron::modifiers::RedirectRaw;
+use iron::status;
+use iron::Url;
+use params::Value;
+use types::StringError;
 
 #[derive(Serialize)]
 struct UploadStatus {
-    url : String,
+    url: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -70,16 +81,16 @@ struct UploadStatus {
 enum FileType {
     File,
     Url,
-    Text
+    Text,
 }
 
 impl FileType {
-    fn from_str(name : &str) -> Option<FileType> {
+    fn from_str(name: &str) -> Option<FileType> {
         match name {
             "file" => Some(FileType::File),
             "url" => Some(FileType::Url),
             "text" => Some(FileType::Text),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -87,17 +98,19 @@ impl FileType {
 #[allow(dead_code)]
 mod metadata_rfc2822 {
     use chrono::{DateTime, FixedOffset};
-    use serde::{self, Deserialize, Serializer, Deserializer};
+    use serde::{self, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(date: &DateTime<FixedOffset>, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         let s = date.to_rfc2822();
         serializer.serialize_str(&s)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<FixedOffset>, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
         DateTime::parse_from_rfc2822(&s).map_err(serde::de::Error::custom)
@@ -109,58 +122,58 @@ struct FileMetadata {
     #[serde(with = "metadata_rfc2822")]
     date: DateTime<FixedOffset>, // Mon, 11 Dec 2017 10:28:36 +0000"
     #[serde(rename = "type")]
-    file_type : FileType,
-    url : Option<String>,
-    filename : Option<String>,
-    actual_filename : Option<String>
+    file_type: FileType,
+    url: Option<String>,
+    filename: Option<String>,
+    actual_filename: Option<String>,
 }
 
 #[derive(Serialize)]
 struct ManageMetadata {
-    name : String,
-    meta : FileMetadata
+    name: String,
+    meta: FileMetadata,
 }
 
 impl FileMetadata {
-    fn new_from_file(filename : String, actual_filename : String) -> Self {
+    fn new_from_file(filename: String, actual_filename: String) -> Self {
         Self {
-            date : Local::now().with_timezone(&FixedOffset::east(0)),
-            file_type : FileType::File,
-            filename : Some(filename),
-            actual_filename : Some(actual_filename),
-            url : None
+            date: Local::now().with_timezone(&FixedOffset::east(0)),
+            file_type: FileType::File,
+            filename: Some(filename),
+            actual_filename: Some(actual_filename),
+            url: None,
         }
     }
 
-    fn new_from_text(filename : String, actual_filename : String) -> Self {
+    fn new_from_text(filename: String, actual_filename: String) -> Self {
         Self {
-            date : Local::now().with_timezone(&FixedOffset::east(0)),
-            file_type : FileType::Text,
-            filename : Some(filename),
-            actual_filename : Some(actual_filename),
-            url : None
+            date: Local::now().with_timezone(&FixedOffset::east(0)),
+            file_type: FileType::Text,
+            filename: Some(filename),
+            actual_filename: Some(actual_filename),
+            url: None,
         }
     }
 
-    fn new_from_url(url : String) -> Self {
+    fn new_from_url(url: String) -> Self {
         Self {
-            date : Local::now().with_timezone(&FixedOffset::east(0)),
-            file_type : FileType::Url,
-            filename : None,
-            actual_filename : None,
-            url : Some(url)
+            date: Local::now().with_timezone(&FixedOffset::east(0)),
+            file_type: FileType::Url,
+            filename: None,
+            actual_filename: None,
+            url: Some(url),
         }
     }
 }
 
-fn parse_meta(file : &str) -> Option<FileMetadata> {
+fn parse_meta(file: &str) -> Option<FileMetadata> {
     let meta_filename = "d/".to_string() + file + ".info.json";
     let path = Path::new(&meta_filename);
     let mut meta_file = match File::open(&path) {
         Err(_) => {
             println!("File {} doesn't exist!", file);
             return None;
-        },
+        }
         Ok(file) => file,
     };
 
@@ -169,11 +182,11 @@ fn parse_meta(file : &str) -> Option<FileMetadata> {
         Err(_) => {
             println!("File {} is unreadable!", file);
             return None;
-        },
+        }
         Ok(_) => (),
     }
 
-    let meta : serde_json::Result<FileMetadata> = serde_json::from_str(&meta_string);
+    let meta: serde_json::Result<FileMetadata> = serde_json::from_str(&meta_string);
     match meta {
         Ok(meta) => Some(meta),
         Err(why) => {
@@ -183,8 +196,8 @@ fn parse_meta(file : &str) -> Option<FileMetadata> {
     }
 }
 
-#[post("/<input_type>", data = "<data>", rank = 1)]
-fn upload(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file : RandomFilename,
+//#[post("/<input_type>", data = "<data>", rank = 1)]
+/*fn upload(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file : RandomFilename,
     config : State<Config>, input_type : String)
     -> Result<Json<UploadStatus>, String> {
     let input_type = match FileType::from_str(&input_type) {
@@ -317,23 +330,61 @@ fn upload(data : Data, _user : APIUser, boundary : MultipartBoundary, out_file :
     }
 }
 
-#[post("/<_url_type>", data = "<_data>", rank = 2)]
+//#[post("/<_url_type>", data = "<_data>", rank = 2)]
 fn upload_no_auth(_url_type : String, _data : Data) -> Result<String, String> {
     Err(format!("Non-authed request"))
-}
+}*/
 
-#[post("/login", data = "<task>")]
-fn login(task: Form<LoginAttempt>, mut cookies: Cookies, sessions: State<Mutex<SessionStore>>,
-         config : State<Config>) -> Redirect {
-    let username = task.get().username.clone();
+//#[post("/login", data = "<task>")]
+fn login(req: &mut Request) -> IronResult<Response> {
+    let (username, password) = {
+        let map = req.get_ref::<Params>().unwrap();
+        let username = map.get("username").ok_or_else(|| {
+            IronError::new(
+                StringError("Unable to find username in submitted form".into()),
+                (status::BadRequest, "Missing form params"),
+            )
+        })?;
 
-    let password_str = task.get().password.clone();
-    let mut password = sha2::Sha256::default();
-    password.input(password_str.as_bytes());
-    let password = password.result();
-    let password = base64::encode(&password);
+        let username = match username {
+            &Value::String(ref str) => str,
+            _ => {
+                return Err(IronError::new(
+                    StringError("Username isn't a string!".into()),
+                    (status::BadRequest, "Bad form params"),
+                ))
+            }
+        };
+
+        let password_str = map.get("password").ok_or_else(|| {
+            IronError::new(
+                StringError("Unable to find username in submitted form".into()),
+                (status::BadRequest, "Missing form params"),
+            )
+        })?;
+
+        let password_str = match password_str {
+            &Value::String(ref str) => str,
+            _ => {
+                return Err(IronError::new(
+                    StringError("Password isn't a string!".into()),
+                    (status::BadRequest, "Bad form params"),
+                ))
+            }
+        };
+
+        let mut password = sha2::Sha256::default();
+        password.input(password_str.as_bytes());
+        let password = password.result();
+        let password = base64::encode(&password);
+
+        (username.to_string(), password)
+    };
 
     println!("User: {}, password: {}", username, password);
+
+    let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
+    let config = arc.as_ref();
 
     // Find target user
     let mut found = false;
@@ -347,23 +398,32 @@ fn login(task: Form<LoginAttempt>, mut cookies: Cookies, sessions: State<Mutex<S
         }
     }
 
+    println!("Found? {}", found);
+
     if found {
-        let session = sessions.lock().unwrap().new_session(username);
-        cookies.add_private(Cookie::new(LOGIN_COOKIE, session));
-        Redirect::to(".")
+        req.extensions.remove::<SessionKey>();
+        req.extensions.insert::<SessionKey>(User { username });
+
+        Ok(Response::with((
+            status::Found,
+            RedirectRaw("manage".to_string()),
+        )))
     } else {
-        Redirect::to(".?error=invalid-login")
+        Ok(Response::with((
+            status::Found,
+            RedirectRaw(".?error=invalid-login".to_string()),
+        )))
     }
 }
 
-#[get("/logout")]
-fn logout(_user : User, mut cookies: Cookies, sessions: State<Mutex<SessionStore>>) -> Redirect {
-    let api_key = cookies.get_private(LOGIN_COOKIE);
-    if api_key.is_some() {
-        sessions.lock().unwrap().invalidate_session(api_key.unwrap().value().to_string());
-    }
+//#[get("/logout")]
+fn logout(req: &mut Request) -> IronResult<Response> {
+    req.extensions.remove::<SessionKey>();
 
-    Redirect::to(".")
+    Ok(Response::with((
+        status::Found,
+        RedirectRaw(".".to_string()),
+    )))
 }
 
 #[derive(Serialize)]
@@ -372,8 +432,14 @@ pub struct FileViewerState {
     files : Vec<ManageMetadata>
 }
 
-#[get("/")]
-fn manage(user : User) -> Template {
+fn manage(req: &mut Request) -> IronResult<Response> {
+    let user = req.extensions.get::<SessionKey>().ok_or_else(|| {
+        IronError::new(
+            StringError("User attempted to access restricted page".into()),
+            (status::Unauthorized, "You are not logged in"),
+        )
+    })?;
+
     let paths = fs::read_dir("d").unwrap();
 
     let mut found_files : Vec<ManageMetadata> = Vec::new();
@@ -397,42 +463,80 @@ fn manage(user : User) -> Template {
     found_files.sort_by(|a, b|
         b.meta.date.partial_cmp(&a.meta.date).unwrap());
 
-    Template::render("manage", &FileViewerState {
-        username : user.username,
+    Ok(Response::with((status::Ok, Template::new("manage", &FileViewerState {
+        username : user.username.to_owned(),
         files : found_files
-    })
+    }))))
 }
 
-#[get("/", rank = 2)]
-fn homepage() -> Template {
-    Template::render("index", &{})
-}
+fn delete_file(req: &mut Request) -> IronResult<Response> {
+    let file = req
+        .extensions
+        .get::<Router>()
+        .unwrap()
+        .find("file")
+        .ok_or_else(|| {
+            IronError::new(
+                StringError("No file specified for delete operation".into()),
+                (status::NotFound, "No file specified"),
+            )
+        })?;
 
-#[get("/<file>")]
-fn delete_file(_user : User, file: String) -> Option<String> {
     if file.contains(".") || file.contains("/") || file.contains("\\") {
-        return None;
+        return Ok(Response::with((status::NotFound)));
     }
 
-    let meta = parse_meta(&file)?;
+    let meta = match parse_meta(&file) {
+        Some(v) => v,
+        None => return Ok(Response::with((status::NotFound)))
+    };
 
     match meta.actual_filename {
         Some(name) => fs::remove_file(Path::new("d/").join(name)).unwrap(),
-        _ => ()
+        _ => {}
     }
 
-    fs::remove_file(Path::new("d/").join(file + ".info.json")).unwrap();
+    fs::remove_file(Path::new("d/").join(format!("{}.info.json", file))).unwrap();
 
-    Some(format!("Deleted"))
+    Ok(Response::with((status::Ok, "Deleted")))
 }
 
-#[get("/<file>/<to>")]
-fn rename_file(_user : User, file: String, to : String) -> Option<String> {
+fn rename_file(req: &mut Request) -> IronResult<Response> {
+    let router = req
+        .extensions
+        .get::<Router>()
+        .unwrap();
+
+    let file = router
+        .find("source")
+        .ok_or_else(|| {
+            IronError::new(
+                StringError("No source file specified for rename operation".into()),
+                (status::NotFound, "No source file specified"),
+            )
+        })?;
+
+    let to = router
+        .find("target")
+        .ok_or_else(|| {
+            IronError::new(
+                StringError("No target file specified for rename operation".into()),
+                (status::NotFound, "No target file specified"),
+            )
+        })?;
+
     if file.contains(".") || file.contains("/") || file.contains("\\") {
-        return None;
+        return Ok(Response::with((status::NotFound)));
     }
 
-    let mut meta = parse_meta(&file)?;
+    let mut meta = match parse_meta(&file) {
+        Some(v) => v,
+        None => return Ok(Response::with((status::NotFound)))
+    };
+
+    if to.contains(".") || to.contains("/") || to.contains("\\") {
+        return Ok(Response::with((status::NotFound)));
+    }
 
     match meta.actual_filename {
         Some(name) => {
@@ -440,10 +544,10 @@ fn rename_file(_user : User, file: String, to : String) -> Option<String> {
                 Some(raw_name) => {
                     let extension_cloned = name.clone();
                     let extension = &extension_cloned[raw_name.len() ..];
-                    to.clone() + extension
+                    to.to_owned() + extension
                 }
                 _ => {
-                    to.clone()
+                    to.to_owned()
                 }
             };
 
@@ -456,11 +560,11 @@ fn rename_file(_user : User, file: String, to : String) -> Option<String> {
         _ => ()
     }
 
-    fs::remove_file(Path::new("d/").join(file + ".info.json")).unwrap();
+    fs::remove_file(Path::new("d/").join(format!("{}.info.json", file))).unwrap();
 
     let meta_string = match serde_json::to_string(&meta) {
         Ok(val) => val,
-        Err(_) => return None
+        Err(_) => return Ok(Response::with((status::NotFound)))
     };
 
     let target = to.split(".").next().unwrap().to_string();
@@ -473,7 +577,7 @@ fn rename_file(_user : User, file: String, to : String) -> Option<String> {
             println!("Couldn't create {}: {}",
                      meta_filename,
                      why.description());
-            return None;
+            return Ok(Response::with((status::NotFound)));
         },
         Ok(file) => file,
     };
@@ -482,138 +586,220 @@ fn rename_file(_user : User, file: String, to : String) -> Option<String> {
         Err(why) => {
             println!("Failed to write to {}: {}", meta_filename,
                      why.description());
-            return None;
+            return Ok(Response::with((status::NotFound)));
         },
         Ok(_) => (),
     }
 
-    Some(format!("Renamed"))
+    Ok(Response::with((status::Ok, "Renamed")))
 }
 
-enum FileResponseType {
-    File { file : NamedFile, content : ContentType, file_name : String },
-    Redir { redir : Redirect },
-    Template { template : Template }
-}
-
-impl<'r> Responder<'r> for FileResponseType {
-    fn respond_to(self, req: &Request) -> response::Result<'r> {
-        match self {
-            FileResponseType::File { file, content, file_name } => Response::build()
-                    .sized_body(file)
-                    .raw_header("Content-Disposition", format!("inline; filename=\"{}\"", file_name))
-                    .header(content)
-                    .finalize()
-                    .respond_to(req),
-            FileResponseType::Redir { redir } => redir.respond_to(req),
-            FileResponseType::Template { template } => template.respond_to(req)
-        }
+fn homepage(req: &mut Request) -> IronResult<Response> {
+    if req.extensions.get::<SessionKey>().is_some() {
+        return
+            Ok(Response::with((
+                status::Found,
+                RedirectRaw("manage".to_string()),
+            )));
     }
+
+    Ok(Response::with((status::Ok, Template::new("index", {}))))
 }
 
 #[derive(Serialize)]
 struct TextView {
-    contents : String,
-    meta : FileMetadata
+    contents: String,
+    meta: FileMetadata,
 }
 
-#[get("/<file>", rank = 3)]
-fn get_pushed_file(file: String) -> Option<FileResponseType> {
-    if file.contains("..") || file.contains("/") || file.contains("\\") {
-        return None;
+fn get_static_file(path: &str) -> Option<(Vec<u8>, mime::Mime)> {
+    println!("Matching patch: {}", path);
+    let path = PathBuf::from(&path).to_owned();
+    // TODO: Don't unwrap
+    let filename = path.to_str().unwrap();
+
+    match files.read(&("static/".to_owned() + filename)) {
+        Ok(mut file) => {
+            let content_type: mime::Mime = match path.extension() {
+                Some(ext) => match ext.to_str() {
+                    Some(ext) => match mime_guess::get_mime_type_opt(ext) {
+                        Some(v) => v,
+                        None => Mime(TopLevel::Application, SubLevel::OctetStream, Vec::new()),
+                    },
+                    None => Mime(TopLevel::Application, SubLevel::OctetStream, Vec::new()),
+                },
+                None => Mime(TopLevel::Application, SubLevel::OctetStream, Vec::new()),
+            };
+
+            let mut buffer = Vec::new();
+            let size = file.read_to_end(&mut buffer).unwrap();
+
+            Some((buffer, content_type))
+        }
+        Err(_) => None,
+    }
+}
+
+fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
+    let ref path = req
+        .extensions
+        .get::<Router>()
+        .unwrap()
+        .find("")
+        .unwrap_or("");
+
+    // Firstly, see if this is a static file
+    let file = get_static_file(&path);
+
+    match file {
+        // Send static file
+        Some((buffer, content_type)) => {
+            return Ok(Response::with((content_type, status::Ok, buffer)));
+        }
+        _ => {}
     }
 
-    let meta = parse_meta(&file)?;
+    if path.contains("..") || path.contains("/") || path.contains("\\") {
+        return Ok(Response::with((status::NotFound)));
+    }
+
+    let meta = match parse_meta(&path) {
+        Some(v) => v,
+        _ => return Ok(Response::with((status::NotFound))),
+    };
 
     match meta.file_type {
         FileType::File => {
-            match NamedFile::open(Path::new("d/").join(meta.actual_filename.unwrap())).ok() {
-                Some(file) => Some(
-                    FileResponseType::File {
-                        file,
-                        content: ContentType::from(mime_guess::guess_mime_type(Path::new("d/")
-                            .join(meta.filename.clone().unwrap()))),
-                        file_name: meta.filename.clone().unwrap(),
-                    }
-                ),
-                _ => None
+            let file = Path::new("d/").join(meta.actual_filename.unwrap());
+
+            if file.exists() {
+                let content_type = mime_guess::guess_mime_type(&file);
+
+                let mut response = Response::with((content_type, status::Ok, file));
+                response.headers.set(ContentDisposition {
+                    disposition: DispositionType::Inline,
+                    parameters: vec![DispositionParam::Ext(
+                        format!("filename"),
+                        meta.filename
+                            .clone()
+                            .expect("Should have filename for File type"),
+                    )],
+                });
+                return Ok(response);
+            } else {
+                return Ok(Response::with((status::NotFound)));
             }
-        },
-        FileType::Url => Some(FileResponseType::Redir {
-            redir : Redirect::temporary(&meta.url.unwrap())
-        }),
+        }
+        FileType::Url => {
+            // TODO: URLs
+            return Ok(Response::with((
+                status::Found,
+                Redirect(Url::parse(&meta.url.unwrap()).map_err(|x| {
+                    IronError::new(
+                        StringError(x),
+                        (status::InternalServerError, "Unable to build target URL"),
+                    )
+                })?),
+            )));
+        }
         FileType::Text => {
             // Read in text file
             let meta_filename = "d/".to_string() + &meta.actual_filename.clone().unwrap();
             let path = Path::new(&meta_filename);
             let mut meta_file = match File::open(&path) {
                 Err(_) => {
-                    println!("File {} doesn't exist!", file);
-                    return None;
-                },
+                    println!("File {:?} doesn't exist!", path);
+                    return Ok(Response::with((status::NotFound)));
+                }
                 Ok(file) => file,
             };
 
             let mut meta_string = String::new();
             match meta_file.read_to_string(&mut meta_string) {
                 Err(_) => {
-                    println!("File {} is unreadable!", file);
-                    return None;
-                },
+                    println!("File {:?} is unreadable!", path);
+                    return Ok(Response::with((status::NotFound)));
+                }
                 Ok(_) => (),
             }
 
-            Some(FileResponseType::Template {
-                template : Template::render("text", &TextView {
-                    contents : meta_string,
-                    meta
-                })
-            })
-        },
+            return Ok(Response::with((
+                status::Ok,
+                Template::new(
+                    "text",
+                    &TextView {
+                        contents: meta_string,
+                        meta,
+                    },
+                ),
+            )));
+        }
     }
 }
 
-#[get("/<file..>", rank = 4)]
-fn static_files(file: PathBuf) -> Option<Content<Stream<Box<Read>>>> {
-    let path = file.as_path().to_owned();
-    let filename = path.to_str()?;
-    let file = match files.read(&("static/".to_owned() + filename)) {
-        Ok(val) => val,
-        Err(_) => return None
-    };
+#[derive(Copy, Clone)]
+struct ConfigContainer;
 
-    let content_type = match path.extension() {
-        Some(ext) => match ext.to_str() {
-            Some(ext) => match ContentType::from_extension(ext) {
-                Some(val) => val,
-                None => ContentType::Binary
-            },
-            None => ContentType::Binary
-        },
-        None => ContentType::Binary
-    };
+impl Key for ConfigContainer {
+    type Value = Config;
+}
 
-    Some(Content(content_type, Stream::chunked(file, 8192)))
+struct SessionKey {}
+
+impl typemap::Key for SessionKey {
+    type Value = User;
 }
 
 fn main() {
     let config = config::load_config("config.json").unwrap();
 
-    let sessions = SessionStore::new();
+    let mut key = [0 as u8; 32];
 
-    let phrases = PhraseGenerator::new(
+    let mut key_index = 0;
+    for byte in config.key.as_bytes() {
+        if key_index >= 32 {
+            break;
+        }
+
+        key[key_index] = *byte;
+        key_index += 1;
+    }
+
+    let manager = ChaCha20Poly1305SessionManager::<User>::from_key(key);
+    let session_config = SessionConfig::default();
+    let middleware =
+        SessionMiddleware::<User, SessionKey, ChaCha20Poly1305SessionManager<User>>::new(
+            manager,
+            session_config,
+        );
+
+    let mut hbse = HandlebarsEngine::new();
+    hbse.add(Box::new(DirectorySource::new("./templates/", ".hbs")));
+
+    hbse.reload().expect("Unable to load templates");
+
+    /*let phrases = PhraseGenerator::new(
         include_str!("../res/dictionary_adjectives.txt"),
-        include_str!("../res/dictionary_nouns.txt"));
+        include_str!("../res/dictionary_nouns.txt"));*/
 
-    rocket::ignite()
-        .manage(phrases)
-        .manage(config)
-        .manage(Mutex::new(sessions))
-        .mount("/upload", routes![upload, upload_no_auth])
-        .mount("/delete", routes![delete_file])
-        .mount("/rename", routes![rename_file])
-        .mount("/", routes![get_pushed_file, homepage, manage,
-         login, logout, static_files])
-        .attach(Template::fairing())
-        .launch();
+    let addr = "127.0.0.1:8080";
+
+    let mut router = Router::new();
+    router.route(method::Get, "/", homepage, "homepage");
+    router.route(method::Post, "/login", login, "login");
+    router.route(method::Get, "/logout", logout, "logout");
+    router.route(method::Get, "/manage", manage, "manage");
+    router.route(method::Get, "/delete/:file", delete_file, "delete");
+    router.route(method::Get, "/rename/:source/:target", rename_file, "rename");
+    router.route(method::Get, "/*", get_pushed_file, "generic_file_handler");
+
+    let mut chain = Chain::new(router);
+    //chain.link_after(Custom404);
+    chain.link(persistent::Read::<ConfigContainer>::both(config));
+    chain.link_after(hbse);
+
+    Iron::new(middleware.around(Box::new(chain)))
+        .http("localhost:3000")
+        .unwrap();
+
 }
