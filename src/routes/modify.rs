@@ -55,6 +55,8 @@ pub fn delete_file(req: &mut Request) -> IronResult<Response> {
         )
     })?;
 
+    println!("Deleting file {:?}...", file);
+
     match meta.actual_filename {
         Some(name) => fs::remove_file(Path::new(&base_path).join(name)).unwrap(),
         _ => {}
@@ -125,7 +127,7 @@ pub fn rename_file(req: &mut Request) -> IronResult<Response> {
                 _ => to.to_owned(),
             };
 
-            println!("new filename: {}", new_filename);
+            println!("Renaming {:?} to {:?}...", name, new_filename);
 
             meta.actual_filename = Some(new_filename.clone());
             fs::rename(

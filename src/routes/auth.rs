@@ -43,8 +43,6 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
         (username.to_string(), password)
     };
 
-    println!("User {:?} attempted login", username);
-
     let arc = req
         .get::<persistent::Read<ConfigContainer>>()
         .expect("No Confguration object available");
@@ -64,6 +62,8 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
 
     // Respond appropriately
     if found {
+        println!("User {:?} succeeded login.", username);
+
         // The user might have a previous session going
         req.extensions.remove::<SessionStore>();
         req.extensions.insert::<SessionStore>(User { username });
@@ -73,6 +73,8 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
             RedirectRaw("manage".to_string()),
         )))
     } else {
+        println!("User {:?} failed login.", username);
+
         Ok(Response::with((
             status::Found,
             RedirectRaw(".?error=invalid-login".to_string()),
@@ -88,7 +90,10 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
 ///     Headers: optional SessionStore
 pub fn logout(req: &mut Request) -> IronResult<Response> {
     // This returns an Option type, so no SessionStore will be a no-op here.
-    req.extensions.remove::<SessionStore>();
+    match req.extensions.remove::<SessionStore>() {
+        Some(v) => println!("User {:?} logged out.", v.username),
+        _ => {}
+    }
 
     Ok(Response::with((
         status::Found,
