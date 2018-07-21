@@ -23,4 +23,5 @@ macro_rules! extract_param_type {
 }
 
 pub mod auth;
+pub mod manage;
 pub mod upload;
