@@ -1,7 +1,6 @@
 //! Hosts the upload API endpoint.
 
 use ConfigContainer;
-use UploadStatus;
 
 use types::FileMetadata;
 use types::FileType;
@@ -28,6 +27,12 @@ use persistent;
 use router::Router;
 
 use serde_json;
+
+/// Used to build the JSON payload as a response to an upload.
+#[derive(Serialize)]
+struct UploadStatus {
+    url: String,
+}
 
 /// Upload endpoint. Uploads a specified file for a user.
 ///

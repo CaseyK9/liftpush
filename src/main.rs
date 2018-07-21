@@ -72,11 +72,6 @@ use routes::manage::manage;
 
 use types::FileType;
 
-#[derive(Serialize)]
-struct UploadStatus {
-    url: String,
-}
-
 fn delete_file(req: &mut Request) -> IronResult<Response> {
     let base_path = {
         let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
