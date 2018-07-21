@@ -1,8 +1,12 @@
+//! The main entrypoint for the application. Contains the main function for initialisation
+//! of the webserver.
+
 extern crate iron;
 extern crate params;
 extern crate persistent;
 extern crate router;
 extern crate secure_session;
+extern crate handlebars_iron;
 
 #[macro_use]
 extern crate serde_derive;
@@ -18,7 +22,6 @@ extern crate phf;
 
 extern crate chrono;
 
-extern crate handlebars_iron;
 extern crate mime_guess;
 
 mod assets;
@@ -63,7 +66,8 @@ impl Key for ConfigContainer {
 }
 
 fn main() {
-    let config = config::load_config("config.json").unwrap();
+    let config = Config::from_file("config.json").expect("Unable to load configuration");
+    let bind_addr = config.bind_addr.to_owned();
 
     let mut key = [0 as u8; 32];
 
@@ -95,8 +99,6 @@ fn main() {
         include_str!("../res/dictionary_nouns.txt"),
     );
 
-    let addr = "127.0.0.1:3000";
-
     let mut router = Router::new();
     router.route(method::Get, "/", homepage, "homepage");
     router.route(method::Post, "/login", login, "login");
@@ -118,6 +120,6 @@ fn main() {
     chain.link_after(hbse);
 
     Iron::new(middleware.around(Box::new(chain)))
-        .http(addr)
+        .http(bind_addr)
         .unwrap();
 }

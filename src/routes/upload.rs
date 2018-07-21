@@ -143,7 +143,7 @@ pub fn upload(req: &mut Request) -> IronResult<Response> {
             .get::<persistent::Read<ConfigContainer>>()
             .expect("Config file is missing");
         let config = arc.as_ref();
-        config.base_url.to_owned()
+        config.external_url.to_owned()
     };
 
     println!(

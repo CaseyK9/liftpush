@@ -143,7 +143,7 @@ pub fn get_pushed_file(req: &mut Request) -> IronResult<Response> {
             let base_url = {
                 let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
                 let config = arc.as_ref();
-                config.base_url.to_owned()
+                config.external_url.to_owned()
             };
 
             let url = base_url + &path;
