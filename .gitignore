@@ -1,6 +1,5 @@
 .idea/
 *.iml
-Rocket.toml
 config.json
 
 d/
