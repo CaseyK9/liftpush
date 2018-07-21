@@ -17,6 +17,8 @@ use handlebars_iron::Template;
 
 use persistent;
 
+use serde_json;
+
 /// Metadata for each file.
 #[derive(Serialize)]
 struct ManageMetadata {
@@ -28,6 +30,11 @@ struct ManageMetadata {
 #[derive(Serialize)]
 pub struct FileViewerState {
     username: String,
+}
+
+/// Files sent when a user requests them.
+#[derive(Serialize)]
+pub struct FileListing {
     files: Vec<ManageMetadata>,
 }
 
@@ -37,12 +44,6 @@ pub struct FileViewerState {
 ///     Request kind: GET
 ///     Headers: required SessionStore
 pub fn manage(req: &mut Request) -> IronResult<Response> {
-    let base_path = {
-        let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
-        let config = arc.as_ref();
-        config.base_path.to_owned()
-    };
-
     let user = req.extensions.get::<SessionStore>().ok_or_else(|| {
         IronError::new(
             StringError("User attempted to access restricted page".into()),
@@ -50,7 +51,32 @@ pub fn manage(req: &mut Request) -> IronResult<Response> {
         )
     })?;
 
-    let paths = fs::read_dir("d").unwrap();
+    Ok(Response::with((
+        status::Ok,
+        Template::new(
+            "manage",
+            &FileViewerState {
+                username: user.username.to_owned(),
+            },
+        ),
+    )))
+}
+
+pub fn listing(req: &mut Request) -> IronResult<Response> {
+    let base_path = {
+        let arc = req.get::<persistent::Read<ConfigContainer>>().unwrap();
+        let config = arc.as_ref();
+        config.base_path.to_owned()
+    };
+
+    req.extensions.get::<SessionStore>().ok_or_else(|| {
+        IronError::new(
+            StringError("User attempted to access restricted page".into()),
+            (status::Unauthorized, "You are not logged in"),
+        )
+    })?;
+
+    let paths = fs::read_dir(&base_path).unwrap();
 
     let mut found_files: Vec<ManageMetadata> = Vec::new();
 
@@ -78,12 +104,8 @@ pub fn manage(req: &mut Request) -> IronResult<Response> {
 
     Ok(Response::with((
         status::Ok,
-        Template::new(
-            "manage",
-            &FileViewerState {
-                username: user.username.to_owned(),
-                files: found_files,
-            },
-        ),
+        serde_json::to_string(&FileListing {
+                files: found_files
+            }).map_err(|x| IronError::new(x, (status::BadRequest, "Internal I/O error")))?,
     )))
 }

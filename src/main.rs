@@ -46,6 +46,7 @@ use routes::auth::logout;
 use routes::files::get_pushed_file;
 use routes::homepage::homepage;
 use routes::manage::manage;
+use routes::manage::listing;
 use routes::modify::delete_file;
 use routes::modify::rename_file;
 use routes::upload::upload;
@@ -131,6 +132,7 @@ fn main() {
     router.route(method::Post, "/login", login, "login");
     router.route(method::Get, "/logout", logout, "logout");
     router.route(method::Get, "/manage", manage, "manage");
+    router.route(method::Get, "/listing", listing, "listing");
     router.route(method::Get, "/delete/:file", delete_file, "delete");
     router.route(
         method::Get,
@@ -152,7 +154,7 @@ fn main() {
             .iter()
             .map(|s| s.to_string())
             .collect(),
-        vec!["", "login", "logout", "manage"]
+        vec!["", "login", "logout", "manage", "listing"]
             .iter()
             .map(|s| s.to_string())
             .collect(),

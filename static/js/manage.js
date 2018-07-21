@@ -1,76 +1,94 @@
-function activateItem(item) {
-    item.addClass("active");
+/**
+ * Makes an AJAX request, returning a JSON payload. Async.
+ */
+function ajaxRequest(url, asJson = false) {
+    return new Promise(function (resolve, reject) {
+        const xmlRequest = new XMLHttpRequest();
+        xmlRequest.onload = function() {
+            if (xmlRequest.status >= 200 && xmlRequest.status < 300) {
+                if (asJson) {
+                    resolve(JSON.parse(xmlRequest.response));
+                } else {
+                    resolve(xmlRequest.response);
+                }
+            } else {
+                console.error("Bad response: " + xmlRequest.response);
+                reject(Error(xmlRequest.statusText));
+            }
+        };
 
-    var type = item.attr("data-type");
-    var name;
-    if (type === "url") {
-        name = item.attr("data-url");
-        $("#file-src").css("display", "none");
-        $("#file-name").text(name);
-        $("#file-modal-name").text(name);
-        $("#rename-modal-name").text(name);
-        $("#file-meta").html("Redirect to <a href=\"" +
-            item.attr("data-target") + "\" target='_blank'>" + item.attr("data-target") + "</a>");
-        $("#file-open").attr("href", name);
-    } else {
-        name = item.attr("data-url");
-        var src = $("#file-src");
-        src.css("display", "block");
-        src.css("background-image", "url(\"" + name + "\")");
-        $("#file-name").text(item.attr("data-name"));
-        $("#file-modal-name").text(item.attr("data-name"));
-        $("#rename-modal-name").text(item.attr("data-name"));
-        $("#file-meta").text(item.attr("data-upload-name") + ", type: " + type);
-        $("#file-open").attr("href", name);
+        xmlRequest.open("GET", url);
+
+        xmlRequest.send();
+    });
+}
+
+// https://stackoverflow.com/questions/5767325/how-do-i-remove-a-particular-element-from-an-array-in-javascript
+function remove(arr, item) {
+    for (let i = arr.length; i--;) {
+        if (arr[i] === item) {
+            arr.splice(i, 1);
+        }
     }
 }
 
-function deleteFile() {
-    var item = $(".collection-item.active");
-    var name = item.attr("data-url");
-    console.log("Deleting " + name);
+const app = new Vue({
+    el: '#index-banner',
+    data: {
+        items: [],
+        active_item: undefined,
+        rename_value: ""
+    },
+    methods: {
+        deleteFile: function(event) {
+            const name = app.active_item.name;
+            console.log("Deleting " + name);
 
-    $.ajax({
-        "url": "delete/" + name
-    });
+            ajaxRequest("delete/" + name).then(function() {
+                console.log("Delete OK")
+            });
 
-    item.remove();
+            remove(app.items, app.active_item);
 
-    $(".collection-item").removeClass("active");
-    resetSelection();
+            app.active_item = undefined;
+        },
+        renameFile: function(event) {
+            const name = app.active_item.name;
+            const target = app.rename_value;
+
+            app.rename_value = "";
+
+            console.log("Renaming " + name + " to " + target);
+
+            ajaxRequest("rename/" + name + "/" + target).then(function() {
+                console.log("Rename OK")
+            });
+
+            let new_active_item = app.active_item;
+            new_active_item.name = target;
+            if (new_active_item.meta.actual_filename) {
+                const extension = new_active_item.meta.actual_filename.split(".")[1];
+                new_active_item.meta.actual_filename = target + "." + extension;
+            }
+
+            for (let i = app.items.length; i--;) {
+                if (app.items[i] === app.active_item) {
+                    app.items[i] = new_active_item;
+                }
+            }
+
+            app.active_item = new_active_item;
+        }
+    }
+});
+
+/**
+ * Updates the Vue set of items from the server.
+ */
+async function updateListing() {
+    app.items = (await ajaxRequest("/listing", true)).files;
 }
 
-function renameFile() {
-    var item = $(".collection-item.active");
-    var name = item.attr("data-url");
-    var target = $("#rename-modal-target").val();
-    console.log("Renaming " + name + " to " + target);
-
-    $.ajax({
-        "url": "rename/" + name + "/" +  target
-    }).done(function() {
-        document.location = document.location + "?";
-    });
-
-    $(".collection-item").removeClass("active");
-    resetSelection();
-}
-
-function collectionClick() {
-    $(".collection-item").removeClass("active");
-    activateItem($(this));
-}
-
-function resetSelection() {
-    var selector = $(".collection-item");
-    selector.click(collectionClick);
-    activateItem(selector.first());
-}
-
-$(function() {
-    $("#delete-file-button").click(deleteFile);
-    $("#rename-file-button").click(renameFile);
-    $('.modal').modal();
-
-    resetSelection();
+window.addEventListener("DOMContentLoaded", function () {
+    updateListing().then(function() {});
 });
