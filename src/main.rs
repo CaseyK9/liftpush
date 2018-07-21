@@ -64,7 +64,6 @@ use secure_session::session::ChaCha20Poly1305SessionManager;
 use handlebars::Handlebars;
 
 use handlebars_iron::HandlebarsEngine;
-use handlebars_iron::MemorySource;
 
 /// The main entrypoint for the application.
 fn main() {
@@ -116,7 +115,7 @@ fn main() {
             .expect("Unable to load template");
     }
 
-    let mut hbse = HandlebarsEngine::from(handlebars);
+    let hbse = HandlebarsEngine::from(handlebars);
 
     // Generate the RNG
     let phrases = PhraseGenerator::new(
