@@ -1,6 +1,7 @@
 //! The main entrypoint for the application. Contains the main function for initialisation
 //! of the webserver.
 
+extern crate handlebars;
 extern crate handlebars_iron;
 extern crate iron;
 extern crate params;
@@ -35,6 +36,8 @@ mod types;
 use auth::*;
 use rng::*;
 
+use assets::TEMPLATES as templates;
+
 use config::Config;
 use config::ConfigContainer;
 
@@ -58,8 +61,10 @@ use router::Router;
 use secure_session::middleware::{SessionConfig, SessionMiddleware};
 use secure_session::session::ChaCha20Poly1305SessionManager;
 
-use handlebars_iron::DirectorySource;
+use handlebars::Handlebars;
+
 use handlebars_iron::HandlebarsEngine;
+use handlebars_iron::MemorySource;
 
 /// The main entrypoint for the application.
 fn main() {
@@ -89,9 +94,29 @@ fn main() {
         );
 
     // Start the templating engine
-    let mut hbse = HandlebarsEngine::new();
-    hbse.add(Box::new(DirectorySource::new("./templates/", ".hbs")));
-    hbse.reload().expect("Unable to load templates");
+    let mut handlebars = Handlebars::new();
+    for filename in templates.file_names() {
+        // Transform "templates/text.hbs" to "text"
+        let template_name = filename
+            .split("/")
+            .skip(1)
+            .next()
+            .expect("No directory split found")
+            .split(".")
+            .next()
+            .expect("No filename found when one was expected");
+
+        println!("Loading {:?} from {:?}", template_name, filename);
+
+        handlebars
+            .register_template_source(
+                template_name,
+                &mut templates.read(filename).expect("Unable to open file"),
+            )
+            .expect("Unable to load template");
+    }
+
+    let mut hbse = HandlebarsEngine::from(handlebars);
 
     // Generate the RNG
     let phrases = PhraseGenerator::new(
@@ -139,6 +164,8 @@ fn main() {
     chain.link(persistent::Read::<ConfigContainer>::both(config));
     chain.link(persistent::Read::<PhraseGeneratorContainer>::both(phrases));
     chain.link_after(hbse);
+
+    println!("Starting server on {:?}...", bind_addr);
 
     Iron::new(chain)
         .http(bind_addr)

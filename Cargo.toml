@@ -6,6 +6,7 @@ authors = ["James <jselby@jselby.net>"]
 [dependencies]
 iron = "0.6.0"
 router = "0.6.0"
+handlebars = "0.32.4"
 handlebars-iron = "0.26.2"
 params = "0.8.0"
 secure-session = "0.3.1"
