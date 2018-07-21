@@ -1,120 +1,135 @@
 {{> header title="Manage" }}
 
-<nav class="light-blue lighten-1" role="navigation" xmlns:v-on="http://www.w3.org/1999/xhtml">
-    <div class="nav-wrapper container">
-        <a id="logo-container" href="#" class="brand-logo">Liftpush</a>
-        <ul id="nav-mobile" class="right">
-            <li class="hide-on-med-and-down">Hello {{username}}</li>
-            <li><a href="logout">Logout</a></li>
-        </ul>
+<nav class="navbar is-info is-fixed-top" role="navigation" aria-label="main navigation">
+    <div class="container">
+        <div class="navbar-brand">
+            <a href="." title="Back to home" class="navbar-item subtitle is-marginless">
+                Liftpush
+            </a>
+
+            <a href="logout" class="navbar-item is-hidden-desktop">
+                Logout
+            </a>
+        </div>
+
+        <div class="navbar-menu">
+            <div class="navbar-end">
+                <div class="navbar-item">
+                    Hello {{username}}
+                </div>
+
+                <a href="logout" class="navbar-item">
+                    Logout
+                </a>
+            </div>
+        </div>
     </div>
 </nav>
 
 <div class="section" id="index-banner">
     <div class="container">
-        <br><br>
-
-        <div class="row">
-            <div class="col s12 m8">
-                <ul class="collection">
-                    <!--{{#each files as |f| ~}}
-                        <li class="collection-item" data-url="{{ f.name }}"
-                            data-target="{{ f.meta.url }}"
-                            data-name="{{ f.meta.actual_filename }}"
-                            data-upload-name="{{ f.meta.filename }}" data-type="{{ f.meta.type }}">
-                            {{#if f.meta.actual_filename}}
-                                {{ f.meta.actual_filename }}
-                            {{else}}
-                                {{ f.name }} &rarr; {{ f.meta.url }}
-                            {{/if}}
-                        </li>
-                    {{/each~}}-->
-                    <li class="collection-item" v-for="item in items" v-on:click="active_item = item"
-                        :class="{ active: active_item && active_item == item }">
+        <div class="columns is-mobile">
+            <div class="column is-half-mobile is-two-thirds-tablet">
+                <div class="panel list-group">
+                    <a class="panel-block list-group-item" v-for="item in items" v-on:click="active_item = item"
+                       :class="{'is-active': active_item && active_item == item}">
                         <span v-if="item.meta.actual_filename">
                             \{{ item.meta.actual_filename }}
                         </span>
                         <span v-else>
                             \{{ item.name }} &rarr; \{{ item.meta.url }}
                         </span>
-                        <!--\{{#if f.meta.actual_filename}}
-                            \{{ f.meta.actual_filename }}
-                        \{{else}}
-                        \{{/if}}-->
-                    </li>
-                </ul>
+                    </a>
+                </div>
             </div>
-
-            <div class="col s12 m4">
+            <div class="column">
                 <div class="card" id="file-holder">
-                    <div class="card-image" id="file-src" v-if="active_item"
-                         v-bind:style="`display:block;background-image: url(` + active_item.name + `)`"></div>
-                    <div class="card-image" id="file-src" v-else></div>
+                    <div class="card-image">
+                        <figure class="image" v-if="active_item">
+                            <img id="file-src" v-if="active_item.meta.type == 'file'" v-bind:src="active_item.name"
+                                 v-bind:alt="active_item.name">
+                        </figure>
+                    </div>
+
                     <div class="card-content">
-                        <span class="card-title black-text" id="file-name">
-                            <span v-if="active_item">
-                                <span v-if="active_item.meta.actual_filename">
-                                    \{{ active_item.meta.actual_filename }}
-                                </span>
-                                <span v-else>
-                                    \{{ item.name }} &rarr; \{{ item.meta.url }}
-                                </span>
-                            </span>
-                            <span v-else>
-                                Select an item.
-                            </span>
+                        <span v-if="active_item">
+                            <div v-if="active_item.meta.actual_filename" class="title is-4">
+                                \{{ active_item.meta.actual_filename }}
+                            </div>
+                            <div v-else class="title is-4">
+                                \{{ active_item.name }} &rarr; \{{ active_item.meta.url }}
+                            </div>
                         </span>
-                        <p id="file-meta">
-                            <span v-if="active_item">
-                                \{{ active_item.meta.filename }},
-                                type: \{{ active_item.meta.type }}
+                        <span v-else class="title is-4">
+                            Select an item.
+                        </span>
+
+                        <span v-if="active_item" class="subtitle is-6">
+                            <span v-if="active_item.meta.filename">
+                                Original name: \{{ active_item.meta.filename }},
                             </span>
-                        </p>
+                            type: \{{ active_item.meta.type }}
+                        </span>
                     </div>
-                    <div class="card-action" v-if="active_item">
-                        <a href="#deleteModal" class="red-text modal-trigger">Delete</a>
-                        <a v-bind:href="active_item.name" target="_blank" id="file-open">Open</a>
-                        <a href="#renameModal" class="modal-trigger">Rename</a>
-                    </div>
+
+                    <footer class="card-footer" v-if="active_item">
+                        <a class="card-footer-item has-text-danger" v-on:click="showDelete = true">Delete</a>
+                        <a class="card-footer-item" v-bind:href="active_item.name" target="_blank" id="file-open">Open</a>
+                        <a class="card-footer-item" v-on:click="showRename = true">Rename</a>
+                    </footer>
                 </div>
             </div>
         </div>
-
-        <br><br>
     </div>
 
-    <div id="deleteModal">
-        <div class="modal-content" v-if="active_item">
-            <h4>Delete file</h4>
-            <p>Are you sure you want to delete \{{ active_item.name }}?</p>
-        </div>
-        <div class="modal-footer">
-            <a href="#!" class="modal-action modal-close waves-effect waves-green btn-flat">Cancel</a>
-            <a href="#!" id="delete-file-button" v-on:click="deleteFile"
-               class="modal-action modal-close waves-effect waves-red btn-flat red-text">OK</a>
-        </div>
-    </div>
-
-    <div id="renameModal">
-        <div class="modal-content" v-if="active_item">
-            <h4>Rename file</h4>
-            <p>Rename \{{ active_item.name }} to what?</p>
-            <div class="input-field">
-                <input id="rename-modal-target" type="text" class="validate" v-model="rename_value">
-                <label for="rename-modal-target">New Name (excluding extension)</label>
+    <transition name="fade">
+        <div class="modal is-active" v-if="showDelete">
+            <div class="modal-background" v-on:click="showDelete = false"></div>
+            <div class="modal-card">
+                <header class="modal-card-head">
+                    <p class="modal-card-title">Delete File</p>
+                </header>
+                <section class="modal-card-body">
+                    <p>Are you sure you want to delete \{{ active_item.name }}?</p>
+                </section>
+                <footer class="modal-card-foot">
+                    <button class="button is-danger" v-on:click="deleteFile">Yes</button>
+                    <button class="button" v-on:click="showDelete = false">No</button>
+                </footer>
             </div>
         </div>
-        <div class="modal-footer">
-            <a href="#!" class="modal-action modal-close waves-effect waves-green btn-flat">Cancel</a>
-            <a href="#!" v-on:click="renameFile"
-               class="modal-action modal-close waves-effect waves-green btn-flat green-text">OK</a>
+    </transition>
+
+    <transition name="fade">
+        <div class="modal is-active" v-if="showRename">
+            <div class="modal-background" v-on:click="showRename = false"></div>
+            <div class="modal-card">
+                <header class="modal-card-head">
+                    <p class="modal-card-title">Rename File</p>
+                </header>
+                <section class="modal-card-body">
+                    <p>Rename \{{ active_item.name }} to what?</p>
+
+                    <div class="field">
+                        <label class="label" for="renameBox">New Name (excluding extension)</label>
+                        <div class="control">
+                            <input id="renameBox" class="input" type="text"
+                                   v-bind:placeholder="active_item.name" v-model="rename_value" />
+                        </div>
+                    </div>
+                </section>
+                <footer class="modal-card-foot">
+                    <button class="button is-success" v-on:click="renameFile">Yes</button>
+                    <button class="button" v-on:click="showRename = false">No</button>
+                </footer>
+            </div>
         </div>
-    </div>
+    </transition>
 </div>
 
 {{> scripts }}
 
-<script type="text/javascript" src="js/vue.min.js"></script>
+<script type="text/javascript" src="js/vue.js"></script>
 <script type="text/javascript" src="js/manage.js"></script>
 
 {{> footer }}

@@ -37,10 +37,14 @@ const app = new Vue({
     data: {
         items: [],
         active_item: undefined,
-        rename_value: ""
+        rename_value: "",
+
+        showDelete: false,
+        showRename: false
     },
     methods: {
         deleteFile: function(event) {
+            app.showDelete = false;
             const name = app.active_item.name;
             console.log("Deleting " + name);
 
@@ -53,6 +57,8 @@ const app = new Vue({
             app.active_item = undefined;
         },
         renameFile: function(event) {
+            app.showRename = false;
+
             const name = app.active_item.name;
             const target = app.rename_value;
 
@@ -61,23 +67,21 @@ const app = new Vue({
             console.log("Renaming " + name + " to " + target);
 
             ajaxRequest("rename/" + name + "/" + target).then(function() {
-                console.log("Rename OK")
-            });
-
-            let new_active_item = app.active_item;
-            new_active_item.name = target;
-            if (new_active_item.meta.actual_filename) {
-                const extension = new_active_item.meta.actual_filename.split(".")[1];
-                new_active_item.meta.actual_filename = target + "." + extension;
-            }
-
-            for (let i = app.items.length; i--;) {
-                if (app.items[i] === app.active_item) {
-                    app.items[i] = new_active_item;
+                let new_active_item = app.active_item;
+                new_active_item.name = target;
+                if (new_active_item.meta.actual_filename) {
+                    const extension = new_active_item.meta.actual_filename.split(".")[1];
+                    new_active_item.meta.actual_filename = target + "." + extension;
                 }
-            }
 
-            app.active_item = new_active_item;
+                for (let i = app.items.length; i--;) {
+                    if (app.items[i] === app.active_item) {
+                        app.items[i] = new_active_item;
+                    }
+                }
+
+                app.active_item = new_active_item;
+            });
         }
     }
 });
@@ -91,4 +95,9 @@ async function updateListing() {
 
 window.addEventListener("DOMContentLoaded", function () {
     updateListing().then(function() {});
+});
+
+window.addEventListener('scroll', () => {
+    console.log("Updating scroll");
+    app.scroll = window.scrollY;
 });

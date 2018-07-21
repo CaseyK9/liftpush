@@ -104,8 +104,7 @@ pub fn listing(req: &mut Request) -> IronResult<Response> {
 
     Ok(Response::with((
         status::Ok,
-        serde_json::to_string(&FileListing {
-                files: found_files
-            }).map_err(|x| IronError::new(x, (status::BadRequest, "Internal I/O error")))?,
+        serde_json::to_string(&FileListing { files: found_files })
+            .map_err(|x| IronError::new(x, (status::BadRequest, "Internal I/O error")))?,
     )))
 }
