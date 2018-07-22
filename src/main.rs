@@ -16,6 +16,7 @@ extern crate secure_session;
 extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
+extern crate toml;
 
 extern crate base64;
 extern crate rand;
@@ -72,7 +73,7 @@ use handlebars_iron::HandlebarsEngine;
 
 /// The main entrypoint for the application.
 fn main() {
-    let config = Config::from_file("config.json").expect("Unable to load configuration");
+    let config = Config::from_file("config.toml").expect("Unable to load configuration");
     let bind_addr = config.bind_addr.to_owned();
 
     // Generate the crypto-key used for sessions, sourced from the configuration key.

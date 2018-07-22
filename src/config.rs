@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use serde_json;
+use toml;
 
 use iron::typemap::Key;
 
@@ -51,7 +51,7 @@ impl Config {
             Err(err) => return Err(err.description().to_string()),
         }
 
-        match serde_json::from_str(&config_contents) {
+        match toml::from_str(&config_contents) {
             Ok(config) => Ok(config),
             Err(serde_error) => Err(serde_error.description().to_string()),
         }
