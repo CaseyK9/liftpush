@@ -19,7 +19,7 @@ extern crate serde_json;
 
 extern crate base64;
 extern crate rand;
-extern crate sha2;
+extern crate tiny_keccak;
 
 extern crate phf;
 

@@ -15,8 +15,7 @@ use iron::status;
 use params::Params;
 use params::Value;
 
-use sha2;
-use sha2::Digest;
+use tiny_keccak::Keccak;
 
 use base64;
 
@@ -35,9 +34,12 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
         let password_str = extract_param_type!(map, String, "password")?;
 
         // Hash the inputted password
-        let mut password = sha2::Sha256::default();
-        password.input(password_str.as_bytes());
-        let password = password.result();
+        let mut password_hasher : Keccak = Keccak::new_sha3_256();
+        password_hasher.update(password_str.as_bytes());
+
+        let mut password : [u8; 32] = [0; 32];
+        password_hasher.finalize(&mut password);
+
         let password = base64::encode(&password);
 
         (username.to_string(), password)
