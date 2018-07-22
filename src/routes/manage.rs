@@ -86,8 +86,8 @@ pub fn listing(req: &mut Request) -> IronResult<Response> {
         let filename = path_filename.to_str().unwrap();
 
         if filename.ends_with(".info.json") {
-            let name : Vec<&str> = filename.split(".").collect::<Vec<_>>();
-            let name = name[0 .. name.len() - 2].join(".");
+            let name: Vec<&str> = filename.split(".").collect::<Vec<_>>();
+            let name = name[0..name.len() - 2].join(".");
 
             match FileMetadata::from_path(&base_path, &name) {
                 Ok(meta) => {

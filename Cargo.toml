@@ -20,12 +20,9 @@ rand = "0.5"
 sha2 = "0.7"
 base64 = "0.9"
 
-includedir = "0.4.0"
 phf = "0.7"
+phf_macros = "0.7.22"
 
 mime_guess = "1.8.6"
 
 chrono = {version = "0.4", features = ["serde"]}
-
-[build-dependencies]
-includedir_codegen = "0.4.0"

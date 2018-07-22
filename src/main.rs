@@ -1,5 +1,8 @@
 //! The main entrypoint for the application. Contains the main function for initialisation
 //! of the webserver.
+#![forbid(unsafe_code)]
+#![feature(plugin)]
+#![plugin(phf_macros)]
 
 extern crate handlebars;
 extern crate handlebars_iron;
@@ -18,7 +21,6 @@ extern crate base64;
 extern crate rand;
 extern crate sha2;
 
-extern crate includedir;
 extern crate phf;
 
 extern crate chrono;
@@ -36,6 +38,8 @@ mod types;
 use auth::*;
 use rng::*;
 
+use assets::get_file;
+use assets::list_files;
 use assets::TEMPLATES as templates;
 
 use config::Config;
@@ -95,23 +99,19 @@ fn main() {
 
     // Start the templating engine
     let mut handlebars = Handlebars::new();
-    for filename in templates.file_names() {
+    for file in list_files(&templates) {
         // Transform "templates/text.hbs" to "text"
-        let template_name = filename
-            .split("/")
-            .skip(1)
-            .next()
-            .expect("No directory split found")
+        let template_name = file
             .split(".")
             .next()
             .expect("No filename found when one was expected");
 
-        println!("Loading {:?} from {:?}", template_name, filename);
+        println!("Loading {:?} from {:?}", template_name, file);
 
         handlebars
             .register_template_source(
                 template_name,
-                &mut templates.read(filename).expect("Unable to open file"),
+                &mut get_file(&templates, file).expect("Unable to find indexed value"),
             )
             .expect("Unable to load template");
     }

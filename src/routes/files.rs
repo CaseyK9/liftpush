@@ -6,12 +6,12 @@ use types::FileMetadata;
 use types::FileType;
 use types::StringError;
 
+use assets::get_file;
 use assets::FILES as files;
 
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::path::PathBuf;
 
 use iron::headers::ContentDisposition;
 use iron::headers::DispositionParam;
@@ -39,11 +39,11 @@ struct TextView {
 }
 
 /// Helper function which attempts to find a static file enbedded in the executable.
-fn get_static_file(filename: &str) -> Option<(Vec<u8>, Mime)> {
-    let path = PathBuf::from(&filename).to_owned();
+fn get_static_file(filename: &str) -> Option<(&'static [u8], Mime)> {
+    let path = Path::new(&filename);
 
-    match files.read(&("static/".to_owned() + filename)) {
-        Ok(mut file) => {
+    match get_file(&files, filename) {
+        Some(file) => {
             let content_type: Mime = match path.extension() {
                 Some(ext) => match ext.to_str() {
                     Some(ext) => match mime_guess::get_mime_type_opt(ext) {
@@ -55,12 +55,9 @@ fn get_static_file(filename: &str) -> Option<(Vec<u8>, Mime)> {
                 None => Mime(TopLevel::Application, SubLevel::OctetStream, Vec::new()),
             };
 
-            let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer).unwrap();
-
-            Some((buffer, content_type))
+            Some((file, content_type))
         }
-        Err(_) => None,
+        _ => None,
     }
 }
 
